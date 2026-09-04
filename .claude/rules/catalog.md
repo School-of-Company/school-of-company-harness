@@ -73,3 +73,30 @@ fully independent systems — enabling one does not enable the other.
     `permissions`).
   - `.codex/hooks.json` is a fixed dispatcher-wiring file (no per-project custom keys observed so far) — copy
     it as-is alongside `.codex/hooks/dispatcher/` when any Codex hook module is selected.
+
+## PR Body Content
+
+`POST /pr` must never open a PR with a generic "files synced" message — the body has to list exactly what
+was included, grouped by category, so a reviewer can tell what changed without opening the diff:
+
+```markdown
+## 포함된 항목
+
+### 스킬
+
+- claude/skills/git-commit
+- codex/skills/git-commit
+
+### 에이전트
+
+- claude/agents/doc-polisher
+
+### 훅
+
+- claude/hooks/eslint (`dispatcher`, `settings.json` 자동 포함)
+```
+
+- List the exact catalog item IDs the user checked (not the auto-included dependencies as if they were
+  chosen) — dependency-pulled files (`dispatcher`, `settings.json`/`hooks.json`) get a `자동 포함` note next
+  to the hook module that pulled them in, not their own bullet.
+- Group headers are only the categories actually present in the PR (omit an empty "에이전트" section, etc.).
