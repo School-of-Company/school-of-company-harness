@@ -1,6 +1,6 @@
 ---
 name: api-design
-description: REST API design guide for new endpoints — RESTful URL structure, DTO-only arguments for controllers and services, query parameter binding rules (@RequestParam vs @ModelAttribute), OpenAPI annotations, and CommonApiResponse usage.
+description: REST API design guide for new endpoints — RESTful URL structure, DTO-only arguments for controllers and services, query parameter binding rules (@RequestParam vs @ModelAttribute), OpenAPI annotations, and response format.
 ---
 
 # REST API Design Guide
@@ -19,11 +19,11 @@ a DTO, and every response is a DTO:
 ```kotlin
 // request body → ReqDto
 @PostMapping("/api-keys")
-fun create(@Valid @RequestBody reqDto: CreateApiKeyReqDto): CommonApiResponse<ApiKeyResDto>
+fun create(@Valid @RequestBody reqDto: CreateApiKeyReqDto): ApiKeyResDto
 
 // query parameters → @ModelAttribute ReqDto, not a pile of @RequestParam
 @GetMapping("/students")
-fun query(@Valid @ModelAttribute reqDto: QueryStudentReqDto): CommonApiResponse<List<StudentResDto>>
+fun query(@Valid @ModelAttribute reqDto: QueryStudentReqDto): List<StudentResDto>
 
 // service takes the same DTO — not (name, grade, status, page, size)
 fun query(reqDto: QueryStudentReqDto): List<StudentResDto>
@@ -52,10 +52,13 @@ validation annotations live next to the shape they describe.
 @Operation(summary = "Create API key", description = "...")
 @ApiResponse(responseCode = "200", description = "Success")
 @PostMapping("/api-keys")
-fun create(@Valid @RequestBody reqDto: CreateApiKeyReqDto): CommonApiResponse<ApiKeyResDto>
+fun create(@Valid @RequestBody reqDto: CreateApiKeyReqDto): ApiKeyResDto
 ```
 
 ## Response Format
 
-- Success: `CommonApiResponse(data = ...)`
-- Error: `ExpectedException` → Global Handler
+- Success: return the `ResDto` directly — no envelope/wrapper type. The HTTP status carries the outcome.
+- Error: throw a domain exception → global exception handler turns it into the error body.
+
+Don't wrap successful payloads in a `data` field. Clients read the resource straight from the body, so an
+envelope only adds a layer to unwrap on every call.

@@ -70,30 +70,35 @@ A global guard must treat "no metadata" as allow, otherwise it locks down every 
 
 Cross-cutting concerns that wrap the handler, not per-request decisions:
 
-- **Response shape** — wrap every payload in the standard envelope. This is the NestJS counterpart of the
-  Spring side's `CommonApiResponse`; do it in one global interceptor instead of building the envelope in
-  each controller.
 - **Logging / timing** — `tap()` around the handler.
 - **Timeout** — `timeout(ms)` plus mapping to `RequestTimeoutException`.
 - **Exception mapping** — `catchError()` to convert a low-level error into a domain exception.
 
+**Not** for wrapping successful responses in an envelope. Controllers return the response DTO directly and
+the HTTP status carries the outcome — the same rule as the Spring side (see the `api-design` skill), so a
+client talking to both stacks has nothing to unwrap.
+
 ```ts
 @Injectable()
-export class ResponseEnvelopeInterceptor<T> implements NestInterceptor<
-  T,
-  { data: T }
-> {
-  intercept(
-    _context: ExecutionContext,
-    next: CallHandler<T>,
-  ): Observable<{ data: T }> {
-    return next.handle().pipe(map((data) => ({ data })));
+export class TimingInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(TimingInterceptor.name);
+
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const startedAt = Date.now();
+    const { method, url } = context.switchToHttp().getRequest();
+    return next
+      .handle()
+      .pipe(
+        tap(() =>
+          this.logger.log(`${method} ${url} — ${Date.now() - startedAt}ms`),
+        ),
+      );
   }
 }
 ```
 
 ```ts
-providers: [{ provide: APP_INTERCEPTOR, useClass: ResponseEnvelopeInterceptor }],
+providers: [{ provide: APP_INTERCEPTOR, useClass: TimingInterceptor }],
 ```
 
 Same DI caveat as guards: `app.useGlobalInterceptors()` can't inject, `APP_INTERCEPTOR` can.

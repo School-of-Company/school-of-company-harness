@@ -20,7 +20,8 @@ description: NestJS project architecture and conventions for this team — modul
   `ValidationPipe` needs its runtime metadata.
 - **Guards** — decide only whether the request may reach the handler (authorization, signature checks).
   Guards run _before_ pipes, so they never see a validated DTO — work on the raw request.
-- **Interceptors** — cross-cutting wrapping only: response envelope, logging, timeout, exception mapping.
+- **Interceptors** — cross-cutting wrapping only: logging/timing, timeout, exception mapping. Never a
+  response envelope — controllers return the response DTO as-is, same as the Spring side.
 - **Global guards/interceptors** — register via `APP_GUARD` / `APP_INTERCEPTOR` providers, not
   `useGlobalGuards()` / `useGlobalInterceptors()`, so DI still works.
 - **Stores** — wrap external storage per concern; key building in a `private key()`, TTL as a
