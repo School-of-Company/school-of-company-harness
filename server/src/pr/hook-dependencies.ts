@@ -21,6 +21,7 @@ export async function resolveHookDependencies(
   owner: string,
   repo: string,
   selectedItems: CatalogItem[],
+  catalogRoot: string,
 ): Promise<CollectedFile[]> {
   const files: CollectedFile[] = [];
 
@@ -31,13 +32,13 @@ export async function resolveHookDependencies(
     files.push(
       {
         path: '.claude/hooks/preToolUse.sh',
-        content: readCatalogFile('.claude/hooks/preToolUse.sh'),
+        content: readCatalogFile('.claude/hooks/preToolUse.sh', catalogRoot),
       },
       {
         path: '.claude/hooks/postToolUse.sh',
-        content: readCatalogFile('.claude/hooks/postToolUse.sh'),
+        content: readCatalogFile('.claude/hooks/postToolUse.sh', catalogRoot),
       },
-      await buildClaudeSettings(octokit, owner, repo),
+      await buildClaudeSettings(octokit, owner, repo, catalogRoot),
     );
   }
 
@@ -48,16 +49,16 @@ export async function resolveHookDependencies(
     files.push(
       {
         path: '.codex/hooks/dispatcher/pre-tool-use.sh',
-        content: readCatalogFile('.codex/hooks/dispatcher/pre-tool-use.sh'),
+        content: readCatalogFile('.codex/hooks/dispatcher/pre-tool-use.sh', catalogRoot),
       },
       {
         path: '.codex/hooks/dispatcher/post-tool-use.sh',
-        content: readCatalogFile('.codex/hooks/dispatcher/post-tool-use.sh'),
+        content: readCatalogFile('.codex/hooks/dispatcher/post-tool-use.sh', catalogRoot),
       },
       // Codex의 wiring 파일은 프로젝트별로 달라질 부분이 없는 고정 내용이라 그대로 복사한다.
       {
         path: '.codex/hooks.json',
-        content: readCatalogFile('.codex/hooks.json'),
+        content: readCatalogFile('.codex/hooks.json', catalogRoot),
       },
     );
   }
@@ -83,6 +84,7 @@ async function buildClaudeSettings(
   octokit: Octokit,
   owner: string,
   repo: string,
+  catalogRoot: string,
 ): Promise<CollectedFile> {
   let base: Record<string, unknown>;
   try {
@@ -95,11 +97,11 @@ async function buildClaudeSettings(
     if (!('content' in data)) throw new Error('not a file');
     base = JSON.parse(Buffer.from(data.content, 'base64').toString('utf-8'));
   } catch {
-    base = JSON.parse(readCatalogFile('.claude/templates/settings-base.json'));
+    base = JSON.parse(readCatalogFile('.claude/templates/settings-base.json', catalogRoot));
   }
 
   const hooksFragment = JSON.parse(
-    readCatalogFile('.claude/templates/settings-hooks.json'),
+    readCatalogFile('.claude/templates/settings-hooks.json', catalogRoot),
   ) as { hooks: unknown };
 
   const merged = { ...base, hooks: hooksFragment.hooks };

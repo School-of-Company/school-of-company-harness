@@ -1,6 +1,5 @@
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
-import { CATALOG_ROOT } from '../catalog/catalog-root.js';
 import type { CatalogItem } from '../catalog/catalog.types.js';
 
 export interface CollectedFile {
@@ -21,11 +20,16 @@ export interface CollectedFile {
  * 재귀가 필요하다. 순회하면서 `deployPrefix`를 같이 넘겨, 카탈로그 내 상대 구조가 대상 레포에도
  * 그대로 유지되게 한다 (예: `.claude/skills/write-pr/references/labels.md`).
  *
+ * 카탈로그 루트는 환경설정에서 오므로 인자로 받는다 — 이 모듈은 환경변수를 직접 읽지 않는다.
+ *
  * 모든 카탈로그 파일이 텍스트(md/sh/json/toml)라는 전제로 utf-8로 읽는다 — 바이너리 파일이
  * 카탈로그에 들어올 일이 생기면 base64 처리가 필요해진다.
  */
-export function collectFiles(item: CatalogItem): CollectedFile[] {
-  const absolutePath = join(CATALOG_ROOT, item.path);
+export function collectFiles(
+  item: CatalogItem,
+  catalogRoot: string,
+): CollectedFile[] {
+  const absolutePath = join(catalogRoot, item.path);
 
   if (!item.path.endsWith('/')) {
     return [{ path: item.path, content: readFileSync(absolutePath, 'utf-8') }];
@@ -51,6 +55,9 @@ export function collectFiles(item: CatalogItem): CollectedFile[] {
 }
 
 /** 카탈로그 항목이 아닌 고정 파일(dispatcher 스크립트, settings 템플릿 등)을 직접 읽을 때 사용. */
-export function readCatalogFile(relativePath: string): string {
-  return readFileSync(join(CATALOG_ROOT, relativePath), 'utf-8');
+export function readCatalogFile(
+  relativePath: string,
+  catalogRoot: string,
+): string {
+  return readFileSync(join(catalogRoot, relativePath), 'utf-8');
 }

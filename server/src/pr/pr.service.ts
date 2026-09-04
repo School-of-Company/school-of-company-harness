@@ -8,7 +8,7 @@ import type { CatalogItem } from '../catalog/catalog.types.js';
 import { collectFiles, type CollectedFile } from './file-collector.js';
 import { resolveHookDependencies } from './hook-dependencies.js';
 import { buildPrBody } from './pr-body.js';
-import type { CreatePrRequest, CreatePrResponse } from './pr.dto.js';
+import { CreatePrRequestDto, CreatePrResponseDto } from './pr.dto.js';
 
 @Injectable()
 export class PrService {
@@ -48,11 +48,12 @@ export class PrService {
    * 그건 호출당 커밋 하나가 생긴다. 여기선 여러 파일을 **한 커밋**으로 묶어야 해서 저수준
    * git data API를 쓴다.
    */
-  async createPr(request: CreatePrRequest): Promise<CreatePrResponse> {
-    const { owner, repo, installationId, baseBranch, itemIds } = request;
+  async createPr(dto: CreatePrRequestDto): Promise<CreatePrResponseDto> {
+    const { owner, repo, installationId, baseBranch, itemIds } = dto;
 
     // 웹에서 넘어온 id를 실제 카탈로그 항목으로 해석한다. 모르는 id는 그냥 throw
     // (`.claude/rules/server.md` — 방어 로직 없이 예외를 던지는 정책).
+    const catalogRoot = this.catalogService.getCatalogRoot();
     const catalog = this.catalogService.listItems();
     const selectedItems = itemIds.map((id) => {
       const item = catalog.find((candidate) => candidate.id === id);
@@ -64,8 +65,14 @@ export class PrService {
 
     // 사용자가 고른 항목의 파일들 + 훅을 골랐을 때 자동으로 딸려오는 dispatcher/settings.json
     const files: CollectedFile[] = [
-      ...selectedItems.flatMap((item) => collectFiles(item)),
-      ...(await resolveHookDependencies(octokit, owner, repo, selectedItems)),
+      ...selectedItems.flatMap((item) => collectFiles(item, catalogRoot)),
+      ...(await resolveHookDependencies(
+        octokit,
+        owner,
+        repo,
+        selectedItems,
+        catalogRoot,
+      )),
     ];
 
     // 1) base 브랜치가 가리키는 커밋 SHA

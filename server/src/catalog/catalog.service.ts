@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
-import { CATALOG_ROOT } from './catalog-root.js';
+import { resolveCatalogRoot } from './catalog-root.js';
 import { extractField } from './frontmatter.js';
 import type { CatalogCategory, CatalogItem } from './catalog.types.js';
 
@@ -64,6 +65,17 @@ function buildItem(
  */
 @Injectable()
 export class CatalogService {
+  private readonly catalogRoot: string;
+
+  constructor(config: ConfigService) {
+    this.catalogRoot = resolveCatalogRoot(config);
+  }
+
+  /** PR 생성 시 파일을 읽어야 하는 쪽에서도 같은 루트를 쓰도록 노출한다. */
+  getCatalogRoot(): string {
+    return this.catalogRoot;
+  }
+
   listItems(): CatalogItem[] {
     return [
       ...this.scanClaudeSkills(),
@@ -86,14 +98,14 @@ export class CatalogService {
   /** 스킬은 디렉터리 단위 — 하위에 `references/`, `scripts/` 등이 딸려올 수 있어서 폴더 전체가 한 항목이다. */
   private scanClaudeSkills(): CatalogItem[] {
     const base = '.claude/skills';
-    return safeReaddir(join(CATALOG_ROOT, base))
-      .filter((name) => isDirectory(join(CATALOG_ROOT, base, name)))
+    return safeReaddir(join(this.catalogRoot, base))
+      .filter((name) => isDirectory(join(this.catalogRoot, base, name)))
       .map((name) =>
         buildItem(
           `claude/skills/${name}`,
           'claude-skill',
           `${base}/${name}/`,
-          join(CATALOG_ROOT, base, name, 'SKILL.md'),
+          join(this.catalogRoot, base, name, 'SKILL.md'),
         ),
       );
   }
@@ -101,7 +113,7 @@ export class CatalogService {
   /** 에이전트는 파일 하나 — 그래서 `path`에 트레일링 슬래시가 없다(파일 vs 디렉터리 구분 신호). */
   private scanClaudeAgents(): CatalogItem[] {
     const base = '.claude/agents';
-    return safeReaddir(join(CATALOG_ROOT, base))
+    return safeReaddir(join(this.catalogRoot, base))
       .filter((name) => name.endsWith('.md'))
       .map((file) => {
         const name = file.replace(/\.md$/, '');
@@ -109,28 +121,28 @@ export class CatalogService {
           `claude/agents/${name}`,
           'claude-agent',
           `${base}/${file}`,
-          join(CATALOG_ROOT, base, file),
+          join(this.catalogRoot, base, file),
         );
       });
   }
 
   private scanCodexSkills(): CatalogItem[] {
     const base = '.agents/skills';
-    return safeReaddir(join(CATALOG_ROOT, base))
-      .filter((name) => isDirectory(join(CATALOG_ROOT, base, name)))
+    return safeReaddir(join(this.catalogRoot, base))
+      .filter((name) => isDirectory(join(this.catalogRoot, base, name)))
       .map((name) =>
         buildItem(
           `codex/skills/${name}`,
           'codex-skill',
           `${base}/${name}/`,
-          join(CATALOG_ROOT, base, name, 'SKILL.md'),
+          join(this.catalogRoot, base, name, 'SKILL.md'),
         ),
       );
   }
 
   private scanCodexAgents(): CatalogItem[] {
     const base = '.codex/agents';
-    return safeReaddir(join(CATALOG_ROOT, base))
+    return safeReaddir(join(this.catalogRoot, base))
       .filter((name) => name.endsWith('.toml'))
       .map((file) => {
         const name = file.replace(/\.toml$/, '');
@@ -138,7 +150,7 @@ export class CatalogService {
           `codex/agents/${name}`,
           'codex-agent',
           `${base}/${file}`,
-          join(CATALOG_ROOT, base, file),
+          join(this.catalogRoot, base, file),
         );
       });
   }
@@ -152,8 +164,8 @@ export class CatalogService {
     base: string,
     category: CatalogCategory,
   ): CatalogItem[] {
-    return safeReaddir(join(CATALOG_ROOT, base))
-      .filter((name) => isDirectory(join(CATALOG_ROOT, base, name)))
+    return safeReaddir(join(this.catalogRoot, base))
+      .filter((name) => isDirectory(join(this.catalogRoot, base, name)))
       .map((name) => ({
         id: `${idPrefix}/${name}`,
         category,
