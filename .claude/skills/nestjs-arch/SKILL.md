@@ -35,9 +35,9 @@ description: NestJS project architecture and conventions for this team — modul
 
 ## Reference
 
-| Topic                                            | Reference                           | Load when                                        |
-| ------------------------------------------------ | ----------------------------------- | ------------------------------------------------ |
-| Directory layout, naming, DI tokens, `@Global()` | `references/module-structure.md`    | Creating a module or provider                    |
-| DTO classes, `ValidationPipe`, `@nestjs/config`  | `references/dto-validation.md`      | Adding an endpoint or config value               |
-| Guards, interceptors, lifecycle order            | `references/guards-interceptors.md` | Adding auth, response envelope, logging, timeout |
-| Test style, mocking                              | `references/testing.md`             | Writing or fixing tests                          |
+| Topic                                            | Reference                           | Load when                              |
+| ------------------------------------------------ | ----------------------------------- | -------------------------------------- |
+| Directory layout, naming, DI tokens, `@Global()` | `references/module-structure.md`    | Creating a module or provider          |
+| DTO classes, `ValidationPipe`, `@nestjs/config`  | `references/dto-validation.md`      | Adding an endpoint or config value     |
+| Guards, interceptors, lifecycle order            | `references/guards-interceptors.md` | Adding authorization, logging, timeout |
+| Test style, mocking                              | `references/testing.md`             | Writing or fixing tests                |
