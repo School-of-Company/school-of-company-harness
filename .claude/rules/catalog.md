@@ -100,8 +100,12 @@ dependencies** (see "Catalog Item Dependency Rule") — nothing else in the targ
 
 ## Error Handling
 
-`POST /pr` does not defend against bad input — an uninstalled repo, an unknown `itemId`, etc. just throw.
-No fallback, no partial success, no silent skip.
+Two layers, deliberately different:
+
+- **Request shape** (missing field, wrong type) — handled by `ValidationPipe` + `class-validator` on the DTO,
+  per the `nestjs-arch` skill.
+- **Business rules** (uninstalled repo, unknown `itemId`, missing base branch) — just throw. No fallback, no
+  partial success, no silent skip; the caller is our own dashboard, not the public.
 
 ## PR Body Content
 
