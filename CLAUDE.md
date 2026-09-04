@@ -15,6 +15,7 @@ Detailed conventions live in `.claude/rules/*.md`, each scoped to the paths it a
 
 @.claude/rules/commit-conventions.md
 @.claude/rules/catalog.md
+@.claude/rules/server.md
 
 **Never add an AI co-author or signature to any commit or PR** — also enforced via
 `attribution: { commit: "", pr: "" }` in `.claude/settings.json`. Keep new conventions in
