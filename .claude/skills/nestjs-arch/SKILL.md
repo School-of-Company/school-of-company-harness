@@ -18,6 +18,11 @@ description: NestJS project architecture and conventions for this team — modul
 - **Validation** — request shape via the global `ValidationPipe`; business rules throw from the service.
 - **Controllers** — bind and delegate, nothing else. Do **not** `import type` a DTO: it's a class and
   `ValidationPipe` needs its runtime metadata.
+- **Guards** — decide only whether the request may reach the handler (authorization, signature checks).
+  Guards run _before_ pipes, so they never see a validated DTO — work on the raw request.
+- **Interceptors** — cross-cutting wrapping only: response envelope, logging, timeout, exception mapping.
+- **Global guards/interceptors** — register via `APP_GUARD` / `APP_INTERCEPTOR` providers, not
+  `useGlobalGuards()` / `useGlobalInterceptors()`, so DI still works.
 - **Stores** — wrap external storage per concern; key building in a `private key()`, TTL as a
   module-level `const`.
 - **Logging** — `private readonly logger = new Logger(ClassName.name)`; Korean messages; pass the error
@@ -29,8 +34,9 @@ description: NestJS project architecture and conventions for this team — modul
 
 ## Reference
 
-| Topic                                            | Reference                        | Load when                          |
-| ------------------------------------------------ | -------------------------------- | ---------------------------------- |
-| Directory layout, naming, DI tokens, `@Global()` | `references/module-structure.md` | Creating a module or provider      |
-| DTO classes, `ValidationPipe`, `@nestjs/config`  | `references/dto-validation.md`   | Adding an endpoint or config value |
-| Test style, mocking                              | `references/testing.md`          | Writing or fixing tests            |
+| Topic                                            | Reference                           | Load when                                        |
+| ------------------------------------------------ | ----------------------------------- | ------------------------------------------------ |
+| Directory layout, naming, DI tokens, `@Global()` | `references/module-structure.md`    | Creating a module or provider                    |
+| DTO classes, `ValidationPipe`, `@nestjs/config`  | `references/dto-validation.md`      | Adding an endpoint or config value               |
+| Guards, interceptors, lifecycle order            | `references/guards-interceptors.md` | Adding auth, response envelope, logging, timeout |
+| Test style, mocking                              | `references/testing.md`             | Writing or fixing tests                          |
