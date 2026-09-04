@@ -74,6 +74,19 @@ fully independent systems — enabling one does not enable the other.
   - `.codex/hooks.json` is a fixed dispatcher-wiring file (no per-project custom keys observed so far) — copy
     it as-is alongside `.codex/hooks/dispatcher/` when any Codex hook module is selected.
 
+## PR Diff Scope
+
+The PR's file changes must be **strictly limited to the selected items plus their auto-included
+dependencies** (see "Catalog Item Dependency Rule") — nothing else in the target repo may be touched.
+
+- Build the commit tree from the target repo's current base tree, adding/replacing only the blobs for
+  selected paths. Never clone-and-overwrite the whole repo, and never delete or modify a file that wasn't
+  explicitly selected (or a resolved dependency of one).
+- `settings.json` is the one exception with special handling (merge, not replace) — see the dependency rule
+  above. Every other selected item is a straight file/directory copy at its catalog path.
+- If the target repo already has a file at that path with different content, it is fine to overwrite it —
+  that's the update the user asked for. What's not fine is touching a path the user never selected.
+
 ## PR Body Content
 
 `POST /pr` must never open a PR with a generic "files synced" message — the body has to list exactly what
