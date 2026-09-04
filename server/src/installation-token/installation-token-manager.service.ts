@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';
 import { createTimedFetch } from '../common/timed-fetch.js';
@@ -38,14 +39,10 @@ export class InstallationTokenManagerService implements InstallationTokenManager
    */
   private readonly tokenCache = new Map<number, CachedToken>();
 
-  constructor() {
-    const appId = process.env.GITHUB_APP_ID;
-    const privateKey = process.env.GITHUB_PRIVATE_KEY;
-    if (!appId || !privateKey) {
-      throw new Error(
-        'GITHUB_APP_ID or GITHUB_PRIVATE_KEY environment variable is not defined',
-      );
-    }
+  constructor(config: ConfigService) {
+    // getOrThrow: 값이 없으면 첫 조회 시점에 바로 실패한다 (fail fast).
+    const appId = config.getOrThrow<string>('GITHUB_APP_ID');
+    const privateKey = config.getOrThrow<string>('GITHUB_PRIVATE_KEY');
     // 인증 요청도 짧은 타임아웃 fetch로 나가야 withRetry가 재시도할 기회를 충분히 갖는다.
     const authRequest = new Octokit({
       request: { fetch: createTimedFetch() },

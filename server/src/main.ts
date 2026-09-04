@@ -1,8 +1,14 @@
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module.js';
 
 /**
  * 진입점.
+ *
+ * `ValidationPipe`를 전역으로 걸어 요청 형태(필드 존재·타입)를 DTO 데코레이터로 검증한다.
+ * `whitelist`는 DTO에 없는 속성을 제거하고, `transform`은 평범한 body를 DTO 클래스 인스턴스로
+ * 바꿔준다. 비즈니스 규칙 검증은 파이프가 아니라 서비스에서 예외로 처리한다.
  *
  * CORS를 켜는 이유: 체크박스 UI가 이 서버와 다른 도메인(`startup-official`)에 있어서, 브라우저가
  * 기본적으로 cross-origin 요청을 막는다. `enableCors`는 응답에
@@ -13,9 +19,14 @@ import { AppModule } from './app.module.js';
  */
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const config = app.get(ConfigService);
+
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.enableCors({
-    origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+    origin: config.get<string>('CORS_ORIGIN') ?? 'http://localhost:3000',
   });
-  await app.listen(process.env.PORT ?? 3000);
+
+  // 기본 포트를 3001로 둔다 — 3000은 대시보드(startup-official) 개발 서버가 쓴다.
+  await app.listen(config.get<number>('PORT') ?? 3001);
 }
 await bootstrap();
