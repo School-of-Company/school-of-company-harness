@@ -87,6 +87,22 @@ dependencies** (see "Catalog Item Dependency Rule") — nothing else in the targ
 - If the target repo already has a file at that path with different content, it is fine to overwrite it —
   that's the update the user asked for. What's not fine is touching a path the user never selected.
 
+## PR Title & Base Branch
+
+- Title reuses the same bracket convention as our own repo's PRs: `[HARNESS] description` (fixed scope,
+  since these PRs land on other repos and have nothing to do with our `web`/`server`/`catalog` scopes).
+- No labels are attached to these PRs.
+- The base branch is **not** auto-detected — `POST /pr` takes it as an explicit `baseBranch` field, set from
+  the web UI (pre-fill it with the target repo's default branch as a convenience, but let the caller override
+  it). There's no per-repo config file to read an override from anymore.
+- Handling a second "Create PR" run against the same repo/selection (new branch vs. reusing an open PR) is
+  left to the server implementation — not a fixed policy here.
+
+## Error Handling
+
+`POST /pr` does not defend against bad input — an uninstalled repo, an unknown `itemId`, etc. just throw.
+No fallback, no partial success, no silent skip.
+
 ## PR Body Content
 
 `POST /pr` must never open a PR with a generic "files synced" message — the body has to list exactly what
