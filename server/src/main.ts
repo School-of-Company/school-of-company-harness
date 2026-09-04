@@ -1,6 +1,16 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 
+/**
+ * 진입점.
+ *
+ * CORS를 켜는 이유: 체크박스 UI가 이 서버와 다른 도메인(`startup-official`)에 있어서, 브라우저가
+ * 기본적으로 cross-origin 요청을 막는다. `enableCors`는 응답에
+ * `Access-Control-Allow-Origin` 헤더를 붙여 지정한 origin의 JS만 이 API를 호출하게 허용한다.
+ *
+ * 주의: CORS는 **브라우저에서만 강제되는 규칙**이라 curl 같은 직접 호출은 전혀 막지 못한다.
+ * 진짜 인증은 없는 상태이고, 그게 의도된 결정이다 (`.claude/rules/server.md`).
+ */
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({
