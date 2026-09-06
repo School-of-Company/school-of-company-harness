@@ -22,9 +22,13 @@ async function bootstrap() {
   const config = app.get(ConfigService);
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  app.enableCors({
-    origin: config.get<string>('CORS_ORIGIN') ?? 'http://localhost:3000',
-  });
+
+  // 배포된 대시보드와 로컬 개발 서버를 동시에 허용해야 하므로 쉼표로 여러 개를 받는다.
+  const origins = (config.get<string>('CORS_ORIGIN') ?? 'http://localhost:3000')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  app.enableCors({ origin: origins });
 
   // 기본 포트를 3001로 둔다 — 3000은 대시보드(startup-official) 개발 서버가 쓴다.
   await app.listen(config.get<number>('PORT') ?? 3001);
