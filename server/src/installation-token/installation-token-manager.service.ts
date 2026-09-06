@@ -5,6 +5,7 @@ import { Octokit } from '@octokit/rest';
 import { createTimedFetch } from '../common/timed-fetch.js';
 import { withRetry } from '../common/retry.js';
 import type { InstallationTokenManager } from './installation-token-manager.interface.js';
+import { loadPrivateKey } from './private-key.js';
 
 /**
  * GitHub의 installation access token은 발급 시점부터 1시간 동안 유효하다. 매 요청마다 새로
@@ -42,15 +43,13 @@ export class InstallationTokenManagerService implements InstallationTokenManager
   constructor(config: ConfigService) {
     // getOrThrow: 값이 없으면 첫 조회 시점에 바로 실패한다 (fail fast).
     const appId = config.getOrThrow<string>('GITHUB_APP_ID');
-    const privateKey = config.getOrThrow<string>('GITHUB_PRIVATE_KEY');
     // 인증 요청도 짧은 타임아웃 fetch로 나가야 withRetry가 재시도할 기회를 충분히 갖는다.
     const authRequest = new Octokit({
       request: { fetch: createTimedFetch() },
     }).request;
     this.appAuth = createAppAuth({
       appId,
-      // .env 파일에 개행이 리터럴 "\n" 문자열로 저장되는 경우가 많아 실제 개행으로 되돌린다.
-      privateKey: privateKey.replace(/\\n/g, '\n'),
+      privateKey: loadPrivateKey(config),
       request: authRequest,
     });
   }
