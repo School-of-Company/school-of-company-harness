@@ -67,10 +67,16 @@ fully independent systems — enabling one does not enable the other.
   2. If one or more are selected:
      - Fetch the target repo's existing `.claude/settings.json` first (fall back to
        `.claude/templates/settings-base.json` if it doesn't have one)
-     - Merge in the `hooks` key from `.claude/templates/settings-hooks.json`
+     - Merge in the entries from `.claude/templates/settings-hooks.json` **per hook entry**, not by
+       replacing the `hooks` key — append what's missing, skip what's already wired (matched on the
+       command path, so a differently written `matcher` doesn't wire the dispatcher twice)
      - Add the resulting `settings.json` plus the dispatcher scripts to the file list automatically
-  - Always start from the target repo's existing file so we never clobber its custom settings (e.g. custom
-    `permissions`).
+  - Always start from the target repo's existing file so we never clobber its custom settings. Top-level
+    keys (`permissions`, `language`, …) are not the only thing at risk: replacing the `hooks` key wholesale
+    silently drops hook entries the target repo added itself, which is a bug we shipped once — a repo's own
+    `Bash(git commit*)` → `preCommit.sh` entry disappeared while the script file stayed, so the hook died
+    without a trace. Entry-level merge (`server/src/pr/settings-merge.ts`) is what keeps that from
+    recurring; it's also idempotent, so a repo that already has our wiring sees no diff at all.
   - `.codex/hooks.json` is a fixed dispatcher-wiring file (no per-project custom keys observed so far) — copy
     it as-is alongside `.codex/hooks/dispatcher/` when any Codex hook module is selected.
 
