@@ -4,10 +4,9 @@ import {
   type InstallationTokenManager,
 } from '../installation-token/installation-token-manager.interface.js';
 import { CatalogService } from '../catalog/catalog.service.js';
-import type { CatalogItem } from '../catalog/catalog.types.js';
 import { collectFiles, type CollectedFile } from './file-collector.js';
 import { resolveHookDependencies } from './hook-dependencies.js';
-import { buildPrBody } from './pr-body.js';
+import { buildCommitMessage, buildPrBody, buildPrTitle } from './pr-body.js';
 import { CreatePrRequestDto, CreatePrResponseDto } from './pr.dto.js';
 
 @Injectable()
@@ -134,11 +133,4 @@ export class PrService {
   }
 }
 
-function buildCommitMessage(items: CatalogItem[]): string {
-  return `chore(harness): ${items.length}개 항목 추가`;
-}
 
-/** 대상 레포용 PR 제목 — 고정 스코프 `[GLOBAL]` (`.claude/rules/catalog.md` 참고). */
-function buildPrTitle(items: CatalogItem[]): string {
-  return `[GLOBAL] ${items.length}개 항목 추가`;
-}

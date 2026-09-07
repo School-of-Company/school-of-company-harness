@@ -109,27 +109,35 @@ Two layers, deliberately different:
 
 ## PR Body Content
 
-`POST /pr` must never open a PR with a generic "files synced" message — the body has to list exactly what
-was included, grouped by category, so a reviewer can tell what changed without opening the diff:
+`POST /pr` must never open a PR with a generic "files synced" message. The reader may not know what the
+harness is, so the body states where it came from, then lists exactly what was included:
 
 ```markdown
+[school-of-company-harness](...)에서 이 저장소에 필요한 AI 도구 설정만 골라 보낸 PR입니다.
+
 ## 포함된 항목
 
 ### 스킬
 
-- claude/skills/git-commit
-- codex/skills/git-commit
-
-### 에이전트
-
-- claude/agents/doc-polisher
+- **api-design** (`Claude`, `Codex`)
 
 ### 훅
 
-- claude/hooks/eslint (`dispatcher`, `settings.json` 자동 포함)
+- **secret-guard** (`Claude`)
+  - 훅은 단독으로 동작하지 않아 `dispatcher`와 `settings.json`이 함께 포함됩니다
+
+## 참고
+
+- 위에 적힌 경로의 파일만 추가·갱신되며, 그 밖의 파일은 건드리지 않습니다.
+- `.claude/settings.json`은 덮어쓰지 않고 기존 내용에 훅 설정만 병합합니다.
+- 머지하면 다음 세션부터 적용됩니다.
 ```
 
-- List the exact catalog item IDs the user checked (not the auto-included dependencies as if they were
-  chosen) — dependency-pulled files (`dispatcher`, `settings.json`/`hooks.json`) get a `자동 포함` note next
-  to the hook module that pulled them in, not their own bullet.
-- Group headers are only the categories actually present in the PR (omit an empty "에이전트" section, etc.).
+- Group by kind (스킬/에이전트/훅) and **merge the same name across platforms** into one bullet with a
+  platform tag — the same item usually arrives as both a Claude and a Codex entry, and listing it twice
+  makes the PR look bigger than it is.
+- List only what the user actually checked. Dependency-pulled files (`dispatcher`,
+  `settings.json`/`hooks.json`) appear as a sub-bullet under the hook that pulled them in, never as their
+  own item — "what I picked" and "what the system added" have to stay distinguishable.
+- Group headers are only the kinds actually present (omit an empty "에이전트" section).
+- The `settings.json` merge note only appears when a hook was selected.
