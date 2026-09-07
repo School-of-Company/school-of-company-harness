@@ -95,8 +95,21 @@ dependencies** (see "Catalog Item Dependency Rule") — nothing else in the targ
 
 ## PR Title & Base Branch
 
-- Title reuses the same bracket convention as our own repo's PRs: `[global] description` (fixed scope,
-  since these PRs land on other repos and touch their tooling as a whole, not one of their domains).
+- Title reuses the same bracket convention as our own repo's PRs, with a fixed `[global]` scope (these
+  PRs land on other repos and touch their tooling as a whole, not one of their domains) and a fixed
+  `하네스 동기화 —` prefix, then what was included:
+
+  ```
+  [global] 하네스 동기화 — 스킬 10 · 에이전트 4 · 훅 5
+  [global] 하네스 동기화 — test 스킬
+  ```
+
+  One item is named outright; several collapse to per-group counts joined with ` · `. The prefix is there
+  because these PRs land in a list next to human-authored ones — the reader should be able to tell at a
+  glance which ones the harness sent. Don't append a verb ("~ 추가"): it carries no information the rest
+  of the title doesn't already give.
+- The commit message uses the same summary without the prefix — the commit convention's `harness` scope
+  already says it: `chore(harness): 스킬 10 · 에이전트 4 · 훅 5 동기화`.
 - No labels are attached to these PRs.
 - The base branch is **not** auto-detected — `POST /pr` takes it as an explicit `baseBranch` field, set from
   the web UI (pre-fill it with the target repo's default branch as a convenience, but let the caller override

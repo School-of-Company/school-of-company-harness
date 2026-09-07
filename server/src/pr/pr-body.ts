@@ -74,30 +74,43 @@ function groupItems(items: CatalogItem[]): Map<string, GroupedItem[]> {
 }
 
 /**
- * 대상 레포용 PR 제목 (`.claude/rules/catalog.md` 참고).
+ * 무엇이 들어왔는지를 한 줄로 요약한다 — PR 제목과 커밋 메시지가 같은 문구를 쓴다.
  *
- * 예전에는 `[global] 3개 항목 추가`처럼 개수만 적었는데, PR 목록에서 제목만 보고는 무엇이
- * 들어왔는지 알 수 없었다. 항목이 하나면 이름을 쓰고, 여러 개면 그룹별 개수로 요약한다.
+ * 예전에는 `3개 항목`처럼 총개수만 적었는데, PR 목록에서 제목만 보고는 무엇이 들어왔는지 알 수
+ * 없었다. 항목이 하나면 이름을 쓰고(`test 스킬`), 여러 개면 그룹별 개수로 줄인다
+ * (`스킬 10 · 에이전트 4 · 훅 5`).
  */
-export function buildPrTitle(selectedItems: CatalogItem[]): string {
-  const grouped = groupItems(selectedItems);
-  const entries = [...grouped.entries()];
+function summarize(selectedItems: CatalogItem[]): string {
+  const entries = [...groupItems(selectedItems).entries()];
   const totalNames = entries.reduce((sum, [, list]) => sum + list.length, 0);
 
   if (totalNames === 1) {
     const [group, list] = entries[0];
-    return `[global] ${list[0].name} ${group} 추가`;
+    return `${list[0].name} ${group}`;
   }
 
-  const summary = entries
-    .map(([group, list]) => `${group} ${list.length}개`)
-    .join('·');
-  return `[global] ${summary} 추가`;
+  return entries
+    .map(([group, list]) => `${group} ${list.length}`)
+    .join(' · ');
 }
 
-/** 커밋 메시지도 제목과 같은 요약을 쓴다 — squash 머지 시 제목이 그대로 커밋이 되기 때문. */
+/**
+ * 대상 레포용 PR 제목 (`.claude/rules/catalog.md` 참고).
+ *
+ * `하네스 동기화`를 앞에 세우고 내용을 뒤에 붙인다. 이 PR을 받는 저장소에는 사람이 직접 만든
+ * PR이 섞여 있으므로, 목록에서 "하네스가 보낸 것"이 한눈에 구분되는 편이 낫다. 대신 정보가
+ * 없는 꼬리말("~ 추가")은 떼고, 무엇이 들어왔는지가 바로 오게 했다.
+ */
+export function buildPrTitle(selectedItems: CatalogItem[]): string {
+  return `[global] 하네스 동기화 — ${summarize(selectedItems)}`;
+}
+
+/**
+ * 커밋 메시지는 제목과 같은 요약을 쓰지만 `하네스 동기화` 접두어는 뺀다 — 커밋 컨벤션의
+ * scope(`harness`)가 이미 같은 말을 하고 있어 두 번 적을 이유가 없다.
+ */
 export function buildCommitMessage(selectedItems: CatalogItem[]): string {
-  return `chore(harness): ${buildPrTitle(selectedItems).replace('[global] ', '')}`;
+  return `chore(harness): ${summarize(selectedItems)} 동기화`;
 }
 
 /**
