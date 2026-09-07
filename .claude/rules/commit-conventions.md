@@ -22,8 +22,8 @@ type(scope): description
 ## PR Title Format
 
 ```
-[SCOPE] description
+[scope] description
 ```
 
-- Scope uses the same vocabulary as commits, uppercase in brackets: `[SERVER]`, `[CATALOG]`
-- Use `[GLOBAL]` for changes spanning both scopes
+- Scope uses the same vocabulary as commits, lowercase in brackets: `[server]`, `[catalog]`
+- Use `[global]` for changes spanning both scopes

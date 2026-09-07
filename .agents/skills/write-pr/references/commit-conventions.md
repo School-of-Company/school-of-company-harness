@@ -12,7 +12,7 @@
 
 ## PR Title Format
 
-`[SCOPE] description`
+`[scope] description`
 
-- Scope는 커밋의 scope와 동일한 어휘 사용, 대문자 대괄호로 표기: `[WEB]`, `[SERVER]`, `[CATALOG]`
-- 여러 scope에 걸친 변경은 `[GLOBAL]` 사용
+- Scope는 커밋의 scope와 동일한 어휘 사용, 소문자 대괄호로 표기: `[server]`, `[catalog]`
+- 여러 scope에 걸친 변경은 `[global]` 사용

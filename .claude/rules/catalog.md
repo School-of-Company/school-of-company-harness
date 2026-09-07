@@ -89,7 +89,7 @@ dependencies** (see "Catalog Item Dependency Rule") — nothing else in the targ
 
 ## PR Title & Base Branch
 
-- Title reuses the same bracket convention as our own repo's PRs: `[GLOBAL] description` (fixed scope,
+- Title reuses the same bracket convention as our own repo's PRs: `[global] description` (fixed scope,
   since these PRs land on other repos and touch their tooling as a whole, not one of their domains).
 - No labels are attached to these PRs.
 - The base branch is **not** auto-detected — `POST /pr` takes it as an explicit `baseBranch` field, set from

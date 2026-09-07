@@ -27,9 +27,9 @@ Read `.agents/skills/write-pr/references/commit-conventions.md` for commit type 
 
 ## Step 3 — Generate PR Content
 
-**Title** — Generate 3 options in the format `[SCOPE] description`:
+**Title** — Generate 3 options in the format `[scope] description`:
 
-- Scope: determine from changed file paths and directory structure (`web` / `server` / `catalog`, or infer a more specific one from the path). Uppercase, wrapped in brackets: `[WEB]`, `[SERVER]`, `[CATALOG]`. Use `[GLOBAL]` / `[CI/CD]` for cross-cutting changes only.
+- Scope: determine from changed file paths and directory structure (`server` / `catalog`, or infer a more specific one from the path). Lowercase, wrapped in brackets: `[server]`, `[catalog]`. Use `[global]` / `[ci/cd]` for cross-cutting changes only.
 - Description: Korean, concise, no emojis, max 50 characters total
 - Wrap class names, method names, annotations, file names, and technical terms in backticks (e.g., `@Transactional`, `QueryProjectServiceImpl`, `SKILL.md`)
 

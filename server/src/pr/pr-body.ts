@@ -76,7 +76,7 @@ function groupItems(items: CatalogItem[]): Map<string, GroupedItem[]> {
 /**
  * 대상 레포용 PR 제목 (`.claude/rules/catalog.md` 참고).
  *
- * 예전에는 `[GLOBAL] 3개 항목 추가`처럼 개수만 적었는데, PR 목록에서 제목만 보고는 무엇이
+ * 예전에는 `[global] 3개 항목 추가`처럼 개수만 적었는데, PR 목록에서 제목만 보고는 무엇이
  * 들어왔는지 알 수 없었다. 항목이 하나면 이름을 쓰고, 여러 개면 그룹별 개수로 요약한다.
  */
 export function buildPrTitle(selectedItems: CatalogItem[]): string {
@@ -86,18 +86,18 @@ export function buildPrTitle(selectedItems: CatalogItem[]): string {
 
   if (totalNames === 1) {
     const [group, list] = entries[0];
-    return `[GLOBAL] ${list[0].name} ${group} 추가`;
+    return `[global] ${list[0].name} ${group} 추가`;
   }
 
   const summary = entries
     .map(([group, list]) => `${group} ${list.length}개`)
     .join('·');
-  return `[GLOBAL] ${summary} 추가`;
+  return `[global] ${summary} 추가`;
 }
 
 /** 커밋 메시지도 제목과 같은 요약을 쓴다 — squash 머지 시 제목이 그대로 커밋이 되기 때문. */
 export function buildCommitMessage(selectedItems: CatalogItem[]): string {
-  return `chore(harness): ${buildPrTitle(selectedItems).replace('[GLOBAL] ', '')}`;
+  return `chore(harness): ${buildPrTitle(selectedItems).replace('[global] ', '')}`;
 }
 
 /**
