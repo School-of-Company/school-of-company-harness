@@ -89,8 +89,8 @@ dependencies** (see "Catalog Item Dependency Rule") — nothing else in the targ
 
 ## PR Title & Base Branch
 
-- Title reuses the same bracket convention as our own repo's PRs: `[HARNESS] description` (fixed scope,
-  since these PRs land on other repos and have nothing to do with our `web`/`server`/`catalog` scopes).
+- Title reuses the same bracket convention as our own repo's PRs: `[GLOBAL] description` (fixed scope,
+  since these PRs land on other repos and touch their tooling as a whole, not one of their domains).
 - No labels are attached to these PRs.
 - The base branch is **not** auto-detected — `POST /pr` takes it as an explicit `baseBranch` field, set from
   the web UI (pre-fill it with the target repo's default branch as a convenience, but let the caller override

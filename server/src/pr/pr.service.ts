@@ -138,7 +138,7 @@ function buildCommitMessage(items: CatalogItem[]): string {
   return `chore(harness): ${items.length}개 항목 추가`;
 }
 
-/** 대상 레포용 PR 제목 — 고정 스코프 `[HARNESS]` (`.claude/rules/catalog.md` 참고). */
+/** 대상 레포용 PR 제목 — 고정 스코프 `[GLOBAL]` (`.claude/rules/catalog.md` 참고). */
 function buildPrTitle(items: CatalogItem[]): string {
-  return `[HARNESS] ${items.length}개 항목 추가`;
+  return `[GLOBAL] ${items.length}개 항목 추가`;
 }
