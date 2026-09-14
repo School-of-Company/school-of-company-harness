@@ -125,6 +125,12 @@ Two layers, deliberately different:
   per the `nestjs-arch` skill.
 - **Business rules** (uninstalled repo, unknown `itemId`, missing base branch) — just throw. No fallback, no
   partial success, no silent skip; the caller is our own dashboard, not the public.
+- **Someone else's fault, but fixable by the user** — throw a Nest exception whose message says what to do.
+  A raw Octokit error surfaces in the web UI as `{"statusCode":500,"message":"Internal server error"}`,
+  which sends the user to the server logs to learn something the API already knew. The two seen so far:
+  a repo with no commits at all (GitHub answers `409 Git Repository is empty.`) and a base branch that
+  doesn't exist (`404`) — both are now `ConflictException` / `NotFoundException` with a Korean message
+  naming the repo and the fix. Add to that list rather than widening a catch-all.
 
 ## PR Body Content
 

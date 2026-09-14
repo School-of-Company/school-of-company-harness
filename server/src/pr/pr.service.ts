@@ -1,4 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   INSTALLATION_TOKEN_MANAGER,
   type InstallationTokenManager,
@@ -75,11 +80,27 @@ export class PrService {
     ];
 
     // 1) base 브랜치가 가리키는 커밋 SHA
-    const baseRef = await octokit.rest.git.getRef({
-      owner,
-      repo,
-      ref: `heads/${baseBranch}`,
-    });
+    //
+    // 여기서 나는 실패는 대개 사용자가 고칠 수 있는 것들이라(빈 레포, 없는 브랜치 이름) 원인을
+    // 그대로 전달한다. 예전에는 Octokit 에러가 그대로 올라가 웹에 "Internal server error"만
+    // 떴는데, 그러면 왜 안 되는지 알 수가 없어서 서버 로그를 봐야 했다.
+    const baseRef = await octokit.rest.git
+      .getRef({ owner, repo, ref: `heads/${baseBranch}` })
+      .catch((error: unknown) => {
+        const status = (error as { status?: number }).status;
+        // 409 = 커밋이 하나도 없는 레포. 브랜치가 아예 없으니 PR을 만들 대상이 없다.
+        if (status === 409) {
+          throw new ConflictException(
+            `${owner}/${repo}은 커밋이 없는 빈 저장소입니다. 먼저 초기 커밋을 만든 뒤 다시 시도하세요.`,
+          );
+        }
+        if (status === 404) {
+          throw new NotFoundException(
+            `${owner}/${repo}에 '${baseBranch}' 브랜치가 없습니다. base 브랜치 이름을 확인하세요.`,
+          );
+        }
+        throw error;
+      });
     // 2) 그 커밋의 tree SHA — 현재 레포 전체 파일 스냅샷
     const baseCommit = await octokit.rest.git.getCommit({
       owner,
