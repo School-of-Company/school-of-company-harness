@@ -1,7 +1,7 @@
 ---
 name: find-skill
 description: Find a skill for a given need in the public registries (skills.sh, awesome-agent-skills, GitHub), vet it, and adapt it into this catalog. Use when someone asks whether a skill exists for some task, or asks to add one from an external source.
-allowed-tools: Bash(git *:*), Bash(gh *:*), Bash(grep *:*), Bash(find *:*), Bash(ls *:*), Read, Write, Edit, WebSearch, WebFetch
+allowed-tools: Bash(git *:*), Bash(gh *:*), Bash(grep *:*), Bash(find *:*), Bash(ls *:*), Bash(bash *search-registry.sh:*), Read, Write, Edit, WebSearch, WebFetch
 ---
 
 # Find a Skill
@@ -23,6 +23,23 @@ instead — a second skill with a similar trigger makes both fire unpredictably.
 
 ## Step 2 — Search
 
+Start with the script — one command, either search backend:
+
+```bash
+bash ".agents/skills/find-skill/scripts/search-registry.sh" "what the skill should do"
+```
+
+With `GEMINI_API_KEY` set it runs a semantic search through Gemini's Google Search; without it, keyword
+search through the GitHub API. Two cautions come with that:
+
+- **Never put repo names or anything private in the query.** On free tiers the prompt can be used to
+  improve the provider's models and be seen by human reviewers. Describe the capability ("code review
+  for a Kotlin + Spring project"), not where it's going.
+- Gemini's list is a *claim*, not a directory listing — it can cite a path that doesn't exist. Confirm
+  each candidate resolves to a real file before spending time on it.
+
+Then widen by hand where the script comes up short:
+
 | Source                                                                              | How                                                                            | Notes                                                                                          |
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
 | [skills.sh](https://www.skills.sh)                                                  | browse by agent/topic                                                          | Registry with install counts; `npx skills add <owner>/<repo>` is how others install — we don't |
@@ -32,6 +49,10 @@ instead — a second skill with a similar trigger makes both fire unpredictably.
 Search the vendor first when the need is tied to a product (Next.js → Vercel, Postgres → Neon,
 Playwright → Microsoft). A skill written by the team that owns the tool ages better than a community
 copy of their docs.
+
+Keyword search ranks badly here: `filename:SKILL.md` matches tens of thousands of files and GitHub can't
+sort code results by stars, so the first page is mostly unknown repos. That's the gap the semantic search
+fills, and why the vendor-first rule matters more than result order.
 
 ## Step 3 — Vet Before Reading Further
 
@@ -62,7 +83,7 @@ Rewrite so a reader can't tell it came from outside:
 - **Trim to what earns its place.** Vendor skills often bundle a tutorial. Keep the decision rules and
   the commands; drop the prose. Move anything long into `references/`.
 - **Platform adaptation.** Mirror to `.claude/skills/<name>/SKILL.md` per `.claude/rules/catalog.md`
-  (literal paths instead of `${CLAUDE_SKILL_DIR}`, no `AskUserQuestion`, drop unsupported frontmatter — this file is the mirror).
+  (literal paths instead of `.agents/skills/find-skill`, no `AskUserQuestion`, drop unsupported frontmatter).
 - **Attribution.** Note the origin in the PR body, not in the skill file. If the source has a license
   that requires it, say so in the PR and keep the notice.
 
