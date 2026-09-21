@@ -29,9 +29,10 @@ Start with the script — one command, either search backend:
 bash "${CLAUDE_SKILL_DIR}/scripts/search-registry.sh" "what the skill should do"
 ```
 
-With `GEMINI_API_KEY` (an AI Studio key, `AIzaSy…`) or `GEMINI_ACCESS_TOKEN` (an OAuth 2 access token)
-set, it runs a semantic search through Gemini's Google Search; without either, keyword search through
-the GitHub API. The output's first lines state which auth it used and why a call failed — worth reading
+**GitHub search is the working path.** Run it as-is and you get keyword search through the GitHub API,
+which needs no key. A semantic search through Gemini's Google Search is also wired in and turns on by
+itself when `GEMINI_API_KEY` (an AI Studio key) or `GEMINI_ACCESS_TOKEN` (an OAuth 2 token) is present,
+or when `~/.gemini-key` holds one. The output's first lines state which auth it used and why a call failed — worth reading
 before concluding the credential is bad. Two things learned the hard way: a `gemini` CLI login token is *not* accepted by this API
 (`Expected OAuth 2 access token…`), and an AI Studio key on a project **without billing** has a quota of
 zero on every model (`Quota exceeded … limit: 0`), so it fails no matter which model you pick. If that's

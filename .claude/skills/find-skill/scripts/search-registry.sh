@@ -20,6 +20,24 @@
 set -euo pipefail
 
 NEED="${1:?사용법: search-registry.sh \"찾는 기능 설명\"}"
+
+# 환경변수가 없으면 `~/.gemini-key` 파일을 본다.
+#
+# 환경변수만 지원했을 때 실제로 겪은 일: 쉘 탭마다 설정이 달라 어떤 값이 쓰였는지 헷갈리고,
+# 클립보드로 넘기면 명령을 복사하는 순간 값이 덮였다. 파일에 한 번 넣어두면 그 왕복이 사라진다.
+#   pbpaste > ~/.gemini-key && chmod 600 ~/.gemini-key
+if [ -z "${GEMINI_API_KEY:-}" ] && [ -f "$HOME/.gemini-key" ]; then
+  GEMINI_API_KEY=$(tr -d '[:space:]' < "$HOME/.gemini-key")
+  export GEMINI_API_KEY
+fi
+
+# 클립보드로 값을 옮기다 보면 엉뚱한 문자열이 들어간다 (실제로 `pbpaste > ~/.gemini-key` 라는
+# 명령 문자열 자체가 저장된 적이 있다). 길이·모양이 키 같지 않으면 호출 전에 알려준다.
+if [ -n "${GEMINI_API_KEY:-}" ] && ! printf '%s' "$GEMINI_API_KEY" | grep -Eq '^[A-Za-z0-9._-]{30,}$'; then
+  echo "주의: 키로 보이지 않는 값이 들어 있습니다 (길이 ${#GEMINI_API_KEY}자)." >&2
+  echo "      ~/.gemini-key 또는 GEMINI_API_KEY 를 다시 설정하세요." >&2
+  echo >&2
+fi
 MODEL="${GEMINI_MODEL:-gemini-3.8-flash}"
 
 github_search() {
@@ -27,6 +45,14 @@ github_search() {
     echo "gh CLI 가 없어 GitHub 검색을 건너뜁니다." >&2
     return 0
   }
+
+  # GitHub 코드 검색은 인덱싱된 토큰만 매칭하므로 한글 쿼리로는 거의 아무것도 못 찾는다.
+  # 우리는 한국어로 생각하니 실수하기 쉬운 지점이라, 조용히 빈 결과를 주기보다 먼저 알려준다.
+  if printf '%s' "$NEED" | grep -q '[가-힣]'; then
+    echo "주의: GitHub 검색은 영어 키워드만 제대로 동작합니다." >&2
+    echo "      예) \"pull request review\", \"nextjs app router\", \"database migration\"" >&2
+    echo >&2
+  fi
 
   # 코드 검색 응답에는 별 개수가 없다. 표시하면 0으로 보여 "인기 없음"으로 오해하게 되므로 뺀다.
   echo "## GitHub 검색 — SKILL.md 파일 (정렬 불가 · 품질 신호 없음)"
@@ -62,7 +88,7 @@ gemini_search() {
   if [ -n "${GEMINI_MODEL:-}" ]; then
     models="$GEMINI_MODEL"
   else
-    models=$(curl -sS -m 30 "https://generativelanguage.googleapis.com/v1beta/models" -H "$header" 2>/dev/null \
+    models=$(curl -sS -m 30 "https://generativelanguage.googleapis.com/v1beta/models" -H "$header" \
       | node -e '
         let raw = "";
         process.stdin.on("data", (c) => (raw += c));
@@ -87,7 +113,7 @@ gemini_search() {
             .slice(0, 4);
           process.stdout.write(ordered.join(" "));
         });
-      ' 2>/dev/null)
+      ')
   fi
 
   if [ -z "$models" ]; then
