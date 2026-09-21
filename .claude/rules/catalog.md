@@ -17,6 +17,12 @@ is the catalog metadata — commit a file to the right location and the web app 
 - **Claude hook module**: `.claude/hooks/modules/<name>/preToolUse.sh` or `postToolUse.sh`
   - `exit 2` = block the tool call, `exit 0` = pass through
   - Hooks never work standalone — see "Catalog Item Dependency Rule" below
+  - **One module per tool, and it must detect its own tool before acting.** A linter module checks for
+    that linter's config/declaration and exits 0 when absent, so installing it into a project that uses
+    a different tool is harmless. What that safety hides is the reverse case: a project using `oxlint`
+    with only the `eslint` module installed gets silence that looks like a passing lint. So when the team
+    adopts a tool we don't have a module for, add the module rather than widening an existing one —
+    `eslint` and `oxlint` are separate items for this reason.
 
 Every item is mirrored for Codex unless it's genuinely Claude-only:
 
