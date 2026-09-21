@@ -3,6 +3,10 @@
 #
 #   bash search-registry.sh "PR diff 를 리뷰해주는 스킬"
 #
+# 무료 등급 주의: 프로젝트에 결제가 붙어 있지 않으면 모든 모델의 한도가 0 이어서
+# ("Quota exceeded ... limit: 0") 어떤 호출도 통하지 않는다. 그럴 땐 아래 GitHub 검색만 쓰면 된다 —
+# 이 스크립트는 그 경우를 정상 경로로 취급한다.
+#
 # 인증은 둘 중 하나가 있으면 된다:
 #   GEMINI_API_KEY       AI Studio 에서 발급한 API 키 (AIzaSy… 로 시작) → x-goog-api-key 헤더
 #   GEMINI_ACCESS_TOKEN  OAuth 액세스 토큰 (ya29.·AQ. 등)            → Authorization: Bearer 헤더
@@ -48,8 +52,49 @@ auth_header() {
 }
 
 gemini_search() {
-  local prompt body response header
+  local prompt header models model body response last_error
+
   header=$(auth_header)
+
+  # 쓸 수 있는 모델을 계정에 물어본다. 이름을 추측하면(예전에 `gemini-3.8-flash` 로 넣었다가)
+  # 엉뚱한 에러 메시지에 시간을 버린다. generateContent 를 지원하는 모델 중 flash 계열을
+  # 최신순으로 하나 고르고, 없으면 첫 번째를 쓴다.
+  if [ -n "${GEMINI_MODEL:-}" ]; then
+    models="$GEMINI_MODEL"
+  else
+    models=$(curl -sS -m 30 "https://generativelanguage.googleapis.com/v1beta/models" -H "$header" 2>/dev/null \
+      | node -e '
+        let raw = "";
+        process.stdin.on("data", (c) => (raw += c));
+        process.stdin.on("end", () => {
+          let parsed;
+          try { parsed = JSON.parse(raw); } catch { return; }
+          if (parsed.error) {
+            console.error("모델 목록 조회 실패: " + (parsed.error.message || ""));
+            return;
+          }
+          const names = (parsed.models || [])
+            .filter((m) => (m.supportedGenerationMethods || []).includes("generateContent"))
+            .map((m) => (m.name || "").replace(/^models\//, ""));
+
+          // preview·exp·omni 계열은 무료 등급 한도가 0 이어서 호출하면 곧바로 429 가 난다
+          // ("limit: 0"). 안정 버전 flash 를 우선하고, 그다음 pro, 마지막에 나머지를 시도한다.
+          const unusableFree = /preview|exp(erimental)?|omni|thinking|tts|image|live|embedding|learnlm/;
+          const stable = names.filter((n) => !unusableFree.test(n));
+          const rank = (n) => (n.includes("flash") ? 0 : n.includes("pro") ? 1 : 2);
+          const ordered = stable
+            .sort((a, b) => rank(a) - rank(b) || b.localeCompare(a))
+            .slice(0, 4);
+          process.stdout.write(ordered.join(" "));
+        });
+      ' 2>/dev/null)
+  fi
+
+  if [ -z "$models" ]; then
+    echo "사용할 모델을 확인하지 못했습니다 (키 권한 또는 네트워크)." >&2
+    return 1
+  fi
+
   prompt="Search for publicly available Claude Code / agent skills (SKILL.md files) that do this: ${NEED}.
 
 List up to 6 candidates. One per line, exactly this shape:
@@ -59,63 +104,64 @@ Rules: only repositories that appear in your search results, no invented paths. 
 by the team that owns the tool over community re-statements of documentation. If you find fewer than 6
 real candidates, list fewer. No preamble, no closing remarks."
 
-  body=$(NEED_PROMPT="$prompt" node -e '
-    process.stdout.write(JSON.stringify({
-      model: process.env.MODEL,
-      input: process.env.NEED_PROMPT,
-      tools: [{ type: "google_search" }],
-    }));
-  ' MODEL="$MODEL" 2>/dev/null) || return 1
+  # 환경변수로만 넘긴다. `node -e '...' NAME=x` 는 인자로 들어가 process.env 에 안 잡히고,
+  # 그러면 본문에서 필드가 조용히 빠져 서버가 엉뚱한 메시지를 준다.
+  request() {
+    NEED_PROMPT="$prompt" SEARCH_TOOL="$1" node -e '
+      const prompt = process.env.NEED_PROMPT;
+      if (!prompt) { process.exit(1); }
+      const tool = process.env.SEARCH_TOOL === "retrieval"
+        ? { google_search_retrieval: {} }
+        : { google_search: {} };
+      process.stdout.write(JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        tools: [tool],
+      }));
+    ' 2>/dev/null
+  }
 
-  # 신 API(interactions)를 먼저 쓰고, 계정이 구 API만 지원하면 generateContent 로 넘어간다.
-  response=$(curl -sS -m 120 -X POST \
-    "https://generativelanguage.googleapis.com/v1beta/interactions" \
-    -H "$header" \
-    -H "Content-Type: application/json" \
-    -d "$body" 2>/dev/null) || return 1
+  # 모델 × 검색 도구 필드(google_search / google_search_retrieval) 조합을 순서대로 시도한다.
+  # 무료 등급에서 못 쓰는 모델은 429 로 걸러지므로, 다음 후보로 넘어가면 된다.
+  response=""
+  for model in $models; do
+    for tool in search retrieval; do
+      body=$(request "$tool") || return 1
+      response=$(curl -sS -m 120 -X POST \
+        "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent" \
+        -H "$header" -H "Content-Type: application/json" -d "$body" 2>/dev/null) || return 1
+
+      if ! printf '%s' "$response" | grep -q '"error"'; then
+        echo "모델: $model"
+        break 2
+      fi
+
+      last_error=$(printf '%s' "$response" | node -e '
+        let raw = ""; process.stdin.on("data", (c) => (raw += c));
+        process.stdin.on("end", () => {
+          try { console.log(JSON.parse(raw).error?.message?.split("\n")[0] || raw.slice(0, 200)); }
+          catch { console.log(raw.slice(0, 200)); }
+        });' 2>/dev/null)
+      echo "  ($model / $tool 실패: ${last_error})" >&2
+    done
+  done
 
   if printf '%s' "$response" | grep -q '"error"'; then
-    local legacy
-    legacy=$(node -e '
-      process.stdout.write(JSON.stringify({
-        contents: [{ parts: [{ text: process.env.NEED_PROMPT }] }],
-        tools: [{ google_search: {} }],
-      }));
-    ' 2>/dev/null)
-    response=$(curl -sS -m 120 -X POST \
-      "https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent" \
-      -H "$header" \
-      -H "Content-Type: application/json" \
-      -d "$legacy" 2>/dev/null) || return 1
+    echo "Gemini 오류: ${last_error}" >&2
+    return 1
   fi
 
-  # 두 응답 형태(신/구)에서 텍스트만 뽑는다. 실패하면 원문을 그대로 보여주는 편이 낫다.
   printf '%s' "$response" | node -e '
     let raw = "";
     process.stdin.on("data", (chunk) => (raw += chunk));
     process.stdin.on("end", () => {
       let parsed;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        console.log(raw.slice(0, 2000));
-        return;
-      }
-      if (parsed.error) {
-        console.error("Gemini 오류: " + (parsed.error.message || "알 수 없음"));
-        process.exit(1);
-      }
-      const fromInteractions = (parsed.output ?? parsed.steps ?? [])
-        .flatMap((step) => step?.content ?? step?.text ?? [])
-        .map((part) => (typeof part === "string" ? part : part?.text))
-        .filter(Boolean)
-        .join("\n");
-      const fromLegacy = (parsed.candidates ?? [])
+      try { parsed = JSON.parse(raw); } catch { console.log(raw.slice(0, 2000)); return; }
+      const text = (parsed.candidates ?? [])
         .flatMap((candidate) => candidate?.content?.parts ?? [])
         .map((part) => part?.text)
         .filter(Boolean)
-        .join("\n");
-      const text = (fromInteractions || fromLegacy).trim();
+        .join("\n")
+        .trim();
       console.log(text || raw.slice(0, 2000));
     });
   '
