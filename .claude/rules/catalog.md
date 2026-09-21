@@ -86,6 +86,26 @@ fully independent systems — enabling one does not enable the other.
   - `.codex/hooks.json` is a fixed dispatcher-wiring file (no per-project custom keys observed so far) — copy
     it as-is alongside `.codex/hooks/dispatcher/` when any Codex hook module is selected.
 
+### Shared Reference Documents
+
+Hooks aren't the only dependency. An item may reference a document under `.claude/shared/`
+(`.agents/shared/` for the Codex copy), and when it does the server ships that document alongside it
+(`server/src/pr/shared-references.ts`).
+
+- **The reference is the declaration.** A path written inside the item's own files is what pulls the
+  document in — no manifest to register, same as the rest of the catalog.
+- `shared/` isn't scanned by `CatalogService`, so these documents never show up as their own checkbox.
+- A referenced path that doesn't exist in the catalog throws, naming the file that referenced it.
+  Skipping it silently would install a skill that tells its reader to open a file that isn't there.
+- Nested references (a shared document referencing another) are not followed — keep them one level deep.
+
+`.claude/shared/commit-conventions.md` is why this exists. `git-commit` and `write-pr` have to agree on
+the commit and PR format, but they're separate checkboxes, so each carried its own copy of the rules —
+and they drifted. `write-pr` was fixed to read the scope vocabulary off the target repo while
+`git-commit` kept a hardcoded list still containing a scope this repo had retired, so a repo that
+installed both got commits and PRs with different vocabularies. One copy, pulled in by whoever
+references it, is what keeps that from recurring.
+
 ## PR Diff Scope
 
 The PR's file changes must be **strictly limited to the selected items plus their auto-included
@@ -176,7 +196,8 @@ harness is, so the body states where it came from, then lists exactly what was i
   platform tag — the same item usually arrives as both a Claude and a Codex entry, and listing it twice
   makes the PR look bigger than it is.
 - List only what the user actually checked. Dependency-pulled files (`dispatcher`,
-  `settings.json`/`hooks.json`) appear as a sub-bullet under the hook that pulled them in, never as their
-  own item — "what I picked" and "what the system added" have to stay distinguishable.
+  `settings.json`/`hooks.json`, and any `shared/` document) appear as a sub-bullet under the item that
+  pulled them in, never as their own item — "what I picked" and "what the system added" have to stay
+  distinguishable.
 - Group headers are only the kinds actually present (omit an empty "에이전트" section).
 - The `settings.json` merge note only appears when a hook was selected.
