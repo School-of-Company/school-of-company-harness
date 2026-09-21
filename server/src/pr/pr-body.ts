@@ -33,9 +33,18 @@ interface GroupedItem {
   platforms: string[];
   hasHookDependency: boolean;
   hookWiringFile?: string;
+  /** 이 항목이 참조해서 함께 실려가는 공용 문서의 파일명. */
+  sharedDocs: string[];
 }
 
-function groupItems(items: CatalogItem[]): Map<string, GroupedItem[]> {
+/**
+ * `sharedByItem`은 항목 id → 그 항목이 참조하는 공용 문서 경로. Claude와 Codex가 같은 문서의
+ * 서로 다른 사본(`.claude/shared/`, `.agents/shared/`)을 가리키므로, 파일명만 남겨 한 줄로 합친다.
+ */
+function groupItems(
+  items: CatalogItem[],
+  sharedByItem: Map<string, string[]> = new Map(),
+): Map<string, GroupedItem[]> {
   const byGroup = new Map<string, Map<string, GroupedItem>>();
 
   for (const item of items) {
@@ -47,10 +56,16 @@ function groupItems(items: CatalogItem[]): Map<string, GroupedItem[]> {
     const platform = platformOf(item);
     const isHook =
       item.category === 'claude-hook' || item.category === 'codex-hook';
+    const docs = (sharedByItem.get(item.id) ?? []).map(
+      (path) => path.split('/').pop()!,
+    );
 
     if (existing) {
       existing.platforms.push(platform);
       if (isHook) existing.hasHookDependency = true;
+      for (const doc of docs) {
+        if (!existing.sharedDocs.includes(doc)) existing.sharedDocs.push(doc);
+      }
     } else {
       bucket.set(item.title, {
         name: item.title,
@@ -61,6 +76,7 @@ function groupItems(items: CatalogItem[]): Map<string, GroupedItem[]> {
             ? 'settings.json'
             : 'hooks.json'
           : undefined,
+        sharedDocs: [...new Set(docs)],
       });
     }
   }
@@ -124,8 +140,9 @@ export function buildCommitMessage(selectedItems: CatalogItem[]): string {
 export function buildPrBody(
   selectedItems: CatalogItem[],
   upToDateItems: CatalogItem[] = [],
+  sharedByItem: Map<string, string[]> = new Map(),
 ): string {
-  const grouped = groupItems(selectedItems);
+  const grouped = groupItems(selectedItems, sharedByItem);
   const hasHook = [...grouped.values()]
     .flat()
     .some((item) => item.hasHookDependency);
@@ -133,9 +150,17 @@ export function buildPrBody(
   const sections = [...grouped.entries()].map(([group, list]) => {
     const lines = list.map((item) => {
       const platforms = item.platforms.map((p) => `\`${p}\``).join(', ');
-      const head = `- **${item.name}** (${platforms})`;
-      if (!item.hasHookDependency) return head;
-      return `${head}\n  - 훅은 단독으로 동작하지 않아 \`dispatcher\`와 \`${item.hookWiringFile}\`이 함께 포함됩니다`;
+      const notes: string[] = [];
+      if (item.hasHookDependency) {
+        notes.push(
+          `훅은 단독으로 동작하지 않아 \`dispatcher\`와 \`${item.hookWiringFile}\`이 함께 포함됩니다`,
+        );
+      }
+      if (item.sharedDocs.length > 0) {
+        const docs = item.sharedDocs.map((doc) => `\`${doc}\``).join(', ');
+        notes.push(`규칙이 적힌 공용 문서 ${docs}이(가) 함께 포함됩니다`);
+      }
+      return [`- **${item.name}** (${platforms})`, ...notes.map((n) => `  - ${n}`)].join('\n');
     });
     return `### ${group}\n\n${lines.join('\n')}`;
   });

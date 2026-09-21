@@ -11,6 +11,10 @@ import {
 import { CatalogService } from '../catalog/catalog.service.js';
 import { collectFiles, type CollectedFile } from './file-collector.js';
 import { resolveHookDependencies } from './hook-dependencies.js';
+import {
+  findSharedReferences,
+  resolveSharedReferences,
+} from './shared-references.js';
 import { buildCommitMessage, buildPrBody, buildPrTitle } from './pr-body.js';
 import { classifyFiles, modeFor } from './tree-diff.js';
 import { CreatePrRequestDto, CreatePrResponseDto } from './pr.dto.js';
@@ -75,13 +79,27 @@ export class PrService {
       item,
       files: collectFiles(item, catalogRoot),
     }));
-    const dependencyFiles: CollectedFile[] = await resolveHookDependencies(
-      octokit,
-      owner,
-      repo,
-      selectedItems,
-      catalogRoot,
+    // 훅이 dispatcher를 끌고 오듯, 공용 문서를 참조하는 항목은 그 문서를 끌고 온다.
+    // 항목별로 어떤 문서를 참조했는지는 PR 본문에서 하위 설명으로 쓰이므로 따로 들고 간다.
+    const sharedByItem = new Map<string, string[]>(
+      perItem.map(({ item, files }) => [
+        item.id,
+        [...findSharedReferences(files).keys()],
+      ]),
     );
+    const dependencyFiles: CollectedFile[] = [
+      ...(await resolveHookDependencies(
+        octokit,
+        owner,
+        repo,
+        selectedItems,
+        catalogRoot,
+      )),
+      ...resolveSharedReferences(
+        perItem.flatMap(({ files }) => files),
+        catalogRoot,
+      ),
+    ];
 
     // 1) base 브랜치가 가리키는 커밋 SHA
     //
@@ -200,7 +218,7 @@ export class PrService {
       title: buildPrTitle(changedItems),
       head: branchName,
       base: baseBranch,
-      body: buildPrBody(changedItems, upToDateItems),
+      body: buildPrBody(changedItems, upToDateItems, sharedByItem),
     });
 
     return { url: pr.data.html_url };
