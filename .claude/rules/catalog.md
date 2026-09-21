@@ -94,6 +94,14 @@ dependencies** (see "Catalog Item Dependency Rule") — nothing else in the targ
 - Build the commit tree from the target repo's current base tree, adding/replacing only the blobs for
   selected paths. Never clone-and-overwrite the whole repo, and never delete or modify a file that wasn't
   explicitly selected (or a resolved dependency of one).
+- **Only send what actually differs.** Compare each file against the target's current tree (blob SHA, plus
+  file mode) and drop the ones already identical — `server/src/pr/tree-diff.ts`. The harness fires at the
+  same repo repeatedly, so a second run must produce a diff of the real changes, not a re-commit of
+  everything the user checked. Consequences worth keeping: an item whose files are all unchanged is
+  excluded from the PR title and listed under 참고 in the body (otherwise it reads as "I checked it but
+  it's missing"), and a selection where nothing differs throws instead of opening an empty PR.
+- Hook scripts go up as mode `100755`. `settings.json` runs `.claude/hooks/preToolUse.sh` as a command,
+  so a `100644` script fails with "Permission denied" in the target repo.
 - `settings.json` is the one exception with special handling (merge, not replace) — see the dependency rule
   above. Every other selected item is a straight file/directory copy at its catalog path.
 - If the target repo already has a file at that path with different content, it is fine to overwrite it —

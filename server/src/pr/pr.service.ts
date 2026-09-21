@@ -12,6 +12,7 @@ import { CatalogService } from '../catalog/catalog.service.js';
 import { collectFiles, type CollectedFile } from './file-collector.js';
 import { resolveHookDependencies } from './hook-dependencies.js';
 import { buildCommitMessage, buildPrBody, buildPrTitle } from './pr-body.js';
+import { classifyFiles, modeFor } from './tree-diff.js';
 import { CreatePrRequestDto, CreatePrResponseDto } from './pr.dto.js';
 
 @Injectable()
@@ -67,17 +68,20 @@ export class PrService {
 
     const octokit = await this.tokenManager.getOctokit(installationId);
 
-    // 사용자가 고른 항목의 파일들 + 훅을 골랐을 때 자동으로 딸려오는 dispatcher/settings.json
-    const files: CollectedFile[] = [
-      ...selectedItems.flatMap((item) => collectFiles(item, catalogRoot)),
-      ...(await resolveHookDependencies(
-        octokit,
-        owner,
-        repo,
-        selectedItems,
-        catalogRoot,
-      )),
-    ];
+    // 사용자가 고른 항목의 파일들 + 훅을 골랐을 때 자동으로 딸려오는 dispatcher/settings.json.
+    // 어떤 파일이 어떤 항목에서 나왔는지 유지한다 — 아래에서 "항목 단위로 이미 최신인지"를
+    // 판단해야 하고, 그 결과가 PR 제목·본문에 그대로 반영되기 때문이다.
+    const perItem = selectedItems.map((item) => ({
+      item,
+      files: collectFiles(item, catalogRoot),
+    }));
+    const dependencyFiles: CollectedFile[] = await resolveHookDependencies(
+      octokit,
+      owner,
+      repo,
+      selectedItems,
+      catalogRoot,
+    );
 
     // 1) base 브랜치가 가리키는 커밋 SHA
     //
@@ -108,14 +112,63 @@ export class PrService {
       commit_sha: baseRef.data.object.sha,
     });
 
-    // 3) 기존 스냅샷 위에 우리 파일만 얹은 새 tree
+    // 2-1) 대상 레포의 현재 파일 목록을 한 번 받아, 이미 같은 내용인 파일을 걸러낸다.
+    //
+    // `recursive: 'true'`면 하위 디렉터리까지 한 번에 오므로 호출 한 번으로 끝난다. 거대한
+    // 레포에서는 응답이 잘릴 수 있는데(`truncated`), 그때는 비교를 포기하고 전부 올린다 —
+    // 잘린 목록으로 비교하면 "대상에 없다"고 잘못 판단해 오히려 위험하다.
+    const baseTree = await octokit.rest.git.getTree({
+      owner,
+      repo,
+      tree_sha: baseCommit.data.tree.sha,
+      recursive: 'true',
+    });
+    const baseEntries = baseTree.data.truncated ? [] : baseTree.data.tree;
+    const comparable = !baseTree.data.truncated;
+
+    /** 항목의 파일이 모두 그대로면 그 항목은 이번 PR에서 빠진다. */
+    const classifiedPerItem = perItem.map(({ item, files: itemFiles }) => ({
+      item,
+      changed: comparable
+        ? classifyFiles(itemFiles, baseEntries)
+            .filter((entry) => entry.kind !== 'unchanged')
+            .map((entry) => entry.file)
+        : itemFiles,
+    }));
+
+    const changedItems = classifiedPerItem
+      .filter(({ changed }) => changed.length > 0)
+      .map(({ item }) => item);
+    const upToDateItems = classifiedPerItem
+      .filter(({ changed }) => changed.length === 0)
+      .map(({ item }) => item);
+
+    const changedDependencyFiles = comparable
+      ? classifyFiles(dependencyFiles, baseEntries)
+          .filter((entry) => entry.kind !== 'unchanged')
+          .map((entry) => entry.file)
+      : dependencyFiles;
+
+    const files: CollectedFile[] = [
+      ...classifiedPerItem.flatMap(({ changed }) => changed),
+      ...changedDependencyFiles,
+    ];
+
+    if (files.length === 0) {
+      throw new ConflictException(
+        `${owner}/${repo}의 ${baseBranch} 브랜치는 선택한 항목이 모두 최신입니다. 변경할 내용이 없어 PR을 만들지 않았습니다.`,
+      );
+    }
+
+    // 3) 기존 스냅샷 위에 바뀐 파일만 얹은 새 tree
     const newTree = await octokit.rest.git.createTree({
       owner,
       repo,
       base_tree: baseCommit.data.tree.sha,
       tree: files.map((file) => ({
         path: file.path,
-        mode: '100644' as const, // 일반 파일 (실행 권한이 필요하면 '100755')
+        // 훅 스크립트는 실행 권한이 있어야 한다 — `settings.json`이 경로를 명령으로 직접 실행한다.
+        mode: modeFor(file.path),
         type: 'blob' as const,
         content: file.content, // 내용을 직접 주면 blob 생성은 GitHub이 대신 처리
       })),
@@ -125,7 +178,7 @@ export class PrService {
     const newCommit = await octokit.rest.git.createCommit({
       owner,
       repo,
-      message: buildCommitMessage(selectedItems),
+      message: buildCommitMessage(changedItems),
       tree: newTree.data.sha,
       parents: [baseRef.data.object.sha],
     });
@@ -144,10 +197,10 @@ export class PrService {
     const pr = await octokit.rest.pulls.create({
       owner,
       repo,
-      title: buildPrTitle(selectedItems),
+      title: buildPrTitle(changedItems),
       head: branchName,
       base: baseBranch,
-      body: buildPrBody(selectedItems),
+      body: buildPrBody(changedItems, upToDateItems),
     });
 
     return { url: pr.data.html_url };

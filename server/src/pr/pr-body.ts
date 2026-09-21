@@ -121,7 +121,10 @@ export function buildCommitMessage(selectedItems: CatalogItem[]): string {
  * 딸려간 dispatcher·설정 파일은 별도 항목이 아니라 해당 훅의 하위 설명으로 표시한다 —
  * "내가 고른 것"과 "시스템이 채운 것"이 구분돼야 리뷰가 쉽다.
  */
-export function buildPrBody(selectedItems: CatalogItem[]): string {
+export function buildPrBody(
+  selectedItems: CatalogItem[],
+  upToDateItems: CatalogItem[] = [],
+): string {
   const grouped = groupItems(selectedItems);
   const hasHook = [...grouped.values()]
     .flat()
@@ -140,6 +143,16 @@ export function buildPrBody(selectedItems: CatalogItem[]): string {
   const notes = [
     '- 위에 적힌 경로의 파일만 추가·갱신되며, 그 밖의 파일은 건드리지 않습니다.',
   ];
+  if (upToDateItems.length > 0) {
+    // 고른 항목 중 내용이 이미 같은 것은 커밋에서 빠진다. 그 사실을 적어 두지 않으면
+    // "분명히 체크했는데 PR에 없다"로 읽히므로, 빠진 이유를 본문에서 밝힌다.
+    const names = [...new Set(upToDateItems.map((item) => item.title))]
+      .map((name) => `\`${name}\``)
+      .join(', ');
+    notes.push(
+      `- ${names}은(는) 이미 같은 내용이어서 이번 커밋에서 제외했습니다.`,
+    );
+  }
   if (hasHook) {
     notes.push(
       '- `.claude/settings.json`은 덮어쓰지 않고 기존 내용에 훅 설정만 병합합니다.',
