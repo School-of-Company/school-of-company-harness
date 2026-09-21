@@ -159,12 +159,20 @@ export class ReposService {
       )
     ).flat();
 
-    const gradlePath = files
-      .filter((path) => /(^|\/)build\.gradle(\.kts)?$/.test(path))
+    // Gradle이든 Maven이든 빌드 스크립트 본문에만 드러나는 것이 있다 (Spring Boot, ktlint, spotless).
+    const buildScriptPath = files
+      .filter((path) => /(^|\/)(build\.gradle(\.kts)?|pom\.xml)$/.test(path))
       .sort((a, b) => depthOf(a) - depthOf(b))[0];
-    const gradleScript = gradlePath ? await readText(gradlePath) : undefined;
+    const buildScript = buildScriptPath
+      ? await readText(buildScriptPath)
+      : undefined;
 
-    return { languages, files, dependencies: [...new Set(dependencies)], gradleScript };
+    return {
+      languages,
+      files,
+      dependencies: [...new Set(dependencies)],
+      buildScript,
+    };
   }
 }
 

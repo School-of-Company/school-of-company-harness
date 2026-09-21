@@ -16,7 +16,7 @@ describe('detectStack', () => {
       languages: ['Java', 'Shell', 'HCL'],
       files: ['build.gradle', 'gradlew', 'settings.gradle'],
       dependencies: [],
-      gradleScript: `plugins {
+      buildScript: `plugins {
         id 'org.springframework.boot' version '3.2.0'
         id 'com.diffplug.spotless' version '6.25.0'
       }`,
@@ -82,6 +82,27 @@ describe('detectStack', () => {
     expect(detected.evidence).toContain('파일: server/oxlint.json');
   });
 
+  it('Maven + Spring 도 감지한다', () => {
+    const detected = detectStack({
+      languages: ['Java'],
+      files: ['pom.xml', 'src/main/resources/application.yml'],
+      dependencies: [],
+      buildScript: '<artifactId>spring-boot-starter-web</artifactId>',
+    });
+
+    expect(detected.stacks).toEqual(expect.arrayContaining(['java', 'spring']));
+    expect(detected.tools).toContain('maven');
+  });
+
+  it('application.yml 만으로도 Spring 으로 본다', () => {
+    const detected = detectStack({
+      languages: ['Kotlin'],
+      files: ['build.gradle.kts', 'src/main/resources/application.yaml'],
+      dependencies: [],
+    });
+    expect(detected.stacks).toContain('spring');
+  });
+
   it('근거를 함께 돌려준다', () => {
     const detected = detectStack({
       languages: ['Kotlin'],
@@ -116,6 +137,14 @@ describe('requirementOf — 이름 규약에서 요구사항을 읽는다', () =
     ).toEqual({});
   });
 
+  it('이름에 든 스택을 모두 요구한다 — Spring 아닌 Java 프로젝트를 걸러내기 위해', () => {
+    expect(
+      requirementOf(
+        item('claude/skills/java-spring-arch', 'java-spring-arch', 'claude-skill'),
+      ),
+    ).toEqual({ stacks: ['java', 'spring'] });
+  });
+
   it('<스택>- 접두어 스킬은 그 스택을 요구한다', () => {
     expect(
       requirementOf(
@@ -125,12 +154,12 @@ describe('requirementOf — 이름 규약에서 요구사항을 읽는다', () =
           'claude-skill',
         ),
       ),
-    ).toEqual({ stack: 'kotlin' });
+    ).toEqual({ stacks: ['kotlin', 'spring'] });
     expect(
       requirementOf(
         item('claude/skills/nestjs-arch', 'nestjs-arch', 'claude-skill'),
       ),
-    ).toEqual({ stack: 'nestjs' });
+    ).toEqual({ stacks: ['nestjs'] });
   });
 
   it('그 밖의 항목은 요구사항이 없다', () => {
@@ -162,12 +191,15 @@ describe('recommendItems', () => {
     item('claude/hooks/secret-guard', 'secret-guard', 'claude-hook'),
   ];
 
-  it('Kotlin + ktlint 저장소', () => {
+  it('Kotlin + Spring + ktlint 저장소', () => {
     const detected = detectStack({
       languages: ['Kotlin'],
       files: ['build.gradle.kts'],
       dependencies: [],
-      gradleScript: "id('org.jlleitschuh.gradle.ktlint')",
+      buildScript: `
+        id('org.jlleitschuh.gradle.ktlint')
+        id('org.springframework.boot')
+      `,
     });
 
     const byTitle = Object.fromEntries(

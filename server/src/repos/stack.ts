@@ -41,6 +41,11 @@ const FILE_SIGNALS: { pattern: RegExp; stacks?: string[]; tools?: string[] }[] =
     { pattern: /^\.ruff\.toml$|^ruff\.toml$/, tools: ['ruff'] },
     { pattern: /^next\.config\./, stacks: ['nextjs'] },
     { pattern: /^nest-cli\.json$/, stacks: ['nestjs'] },
+    // Spring Boot는 설정 파일 이름이 고정이라 그 자체가 강한 신호다.
+    {
+      pattern: /^application(-[\w]+)?\.(yml|yaml|properties)$/,
+      stacks: ['spring'],
+    },
     { pattern: /^\.editorconfig$/ },
   ];
 
@@ -61,15 +66,23 @@ const DEPENDENCY_SIGNALS: {
   { name: 'vitest', tools: ['vitest'] },
 ];
 
-/** Gradle 스크립트 본문에서 드러나는 플러그인 — 설정 파일 없이 플러그인으로만 쓰는 경우가 많다. */
-const GRADLE_SIGNALS: {
+/**
+ * 빌드 스크립트(Gradle·Maven) 본문에서 드러나는 것들 — 플러그인이나 의존성으로만 선언되는 경우가
+ * 많아서, 파일 이름만으로는 알 수 없다.
+ */
+const BUILD_SCRIPT_SIGNALS: {
   pattern: RegExp;
   stacks?: string[];
   tools?: string[];
 }[] = [
   { pattern: /org\.jlleitschuh\.gradle\.ktlint|ktlint/, tools: ['ktlint'] },
   { pattern: /com\.diffplug\.spotless|spotless/, tools: ['spotless'] },
-  { pattern: /org\.springframework\.boot/, stacks: ['spring'] },
+  {
+    pattern: /org\.springframework\.boot|spring-boot-starter|spring-webmvc|spring-context/,
+    stacks: ['spring'],
+  },
+  { pattern: /<artifactId>spring-boot/, stacks: ['spring'] },
+  { pattern: /io\.spring\.dependency-management/, stacks: ['spring'] },
   {
     pattern: /kotlin\(["']jvm["']\)|org\.jetbrains\.kotlin/,
     stacks: ['kotlin'],
@@ -97,8 +110,8 @@ export interface StackSignals {
   files: string[];
   /** package.json 의존성 이름 (dependencies + devDependencies) */
   dependencies: string[];
-  /** build.gradle / build.gradle.kts 본문 (있으면) */
-  gradleScript?: string;
+  /** 빌드 스크립트 본문 — `build.gradle(.kts)` 또는 `pom.xml` (있으면) */
+  buildScript?: string;
 }
 
 /**
@@ -136,13 +149,13 @@ export function detectStack(signals: StackSignals): DetectedStack {
     }
   }
 
-  if (signals.gradleScript) {
-    for (const signal of GRADLE_SIGNALS) {
-      if (!signal.pattern.test(signals.gradleScript)) continue;
+  if (signals.buildScript) {
+    for (const signal of BUILD_SCRIPT_SIGNALS) {
+      if (!signal.pattern.test(signals.buildScript)) continue;
       signal.stacks?.forEach((s) => stacks.add(s));
       signal.tools?.forEach((t) => tools.add(t));
       evidence.push(
-        `gradle 스크립트: ${(signal.stacks ?? signal.tools ?? []).join(', ')}`,
+        `빌드 스크립트: ${(signal.stacks ?? signal.tools ?? []).join(', ')}`,
       );
     }
   }
@@ -166,27 +179,31 @@ export function detectStack(signals: StackSignals): DetectedStack {
  *
  * - 훅 모듈 이름은 그 도구의 이름이다 (`ktlint`, `oxlint`, `jest` …) → 그 도구를 쓰는지 본다
  * - `*-guard` 훅은 도구가 아니라 안전장치다 (`secret-guard`, `command-guard`) → 스택 무관
- * - `<스택>-` 접두어 스킬은 그 스택 전용이다 (`kotlin-spring-arch`, `nestjs-arch`)
+ * - 스킬 이름에 들어간 **모든** 스택 토큰을 요구한다 (`kotlin-spring-arch` → kotlin 그리고 spring).
+ *   접두어 하나만 보면 Spring을 쓰지 않는 순수 Java 프로젝트에도 `java-spring-arch`가 추천된다
  * - 그 밖의 항목은 스택 중립이라 어느 저장소에나 들어간다
  *
  * 규약으로 판단할 수 없는 항목이 생기면 그때 그 파일에 한 줄 적는 쪽으로 열어 둔다(옵트인).
  */
-const STACK_PREFIXES = [
+const KNOWN_STACKS = [
   'kotlin',
   'java',
   'nestjs',
   'nextjs',
   'react',
+  'node',
   'python',
   'go',
+  'rust',
   'spring',
+  'typescript',
 ];
 
 export interface ItemRequirement {
   /** 이 항목이 필요로 하는 도구 (훅) */
   tool?: string;
-  /** 이 항목이 필요로 하는 스택 (아키텍처 스킬) */
-  stack?: string;
+  /** 이 항목이 필요로 하는 스택들 — 전부 충족해야 한다 (아키텍처 스킬) */
+  stacks?: string[];
 }
 
 export function requirementOf(item: CatalogItem): ItemRequirement {
@@ -198,10 +215,11 @@ export function requirementOf(item: CatalogItem): ItemRequirement {
     return { tool: item.title };
   }
 
-  const prefix = STACK_PREFIXES.find((candidate) =>
-    item.title.startsWith(`${candidate}-`),
-  );
-  return prefix ? { stack: prefix } : {};
+  // 이름을 토큰으로 쪼개 알려진 스택만 골라낸다: `kotlin-spring-arch` → ['kotlin', 'spring']
+  const required = item.title
+    .split('-')
+    .filter((token) => KNOWN_STACKS.includes(token));
+  return required.length > 0 ? { stacks: required } : {};
 }
 
 export type Verdict = 'recommended' | 'not-applicable';
@@ -241,17 +259,18 @@ export function recommendItems(
           };
     }
 
-    if (requirement.stack) {
-      return stacks.has(requirement.stack)
+    if (requirement.stacks) {
+      const missing = requirement.stacks.filter((name) => !stacks.has(name));
+      return missing.length === 0
         ? {
             ...base,
             verdict: 'recommended' as const,
-            reason: `${requirement.stack} 프로젝트입니다`,
+            reason: `${requirement.stacks.join(' + ')} 프로젝트입니다`,
           }
         : {
             ...base,
             verdict: 'not-applicable' as const,
-            reason: `${requirement.stack} 프로젝트가 아닙니다`,
+            reason: `${missing.join(', ')}을 쓰는 흔적이 없습니다`,
           };
     }
 
