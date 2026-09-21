@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsInt, IsString } from 'class-validator';
-import type { ItemRecommendation } from './stack.js';
+import type { ItemRecommendation } from './item-matching.js';
 
 /**
  * `GET /repos/:owner/:repo/recommendation?installationId=...` 요청.
