@@ -167,6 +167,15 @@ real candidates, list fewer. No preamble, no closing remarks."
           try { console.log(JSON.parse(raw).error?.message?.split("\n")[0] || raw.slice(0, 200)); }
           catch { console.log(raw.slice(0, 200)); }
         });' 2>/dev/null)
+
+      # 쿼터 초과는 모델을 바꿔도 결과가 같다 — 프로젝트 단위 한도이기 때문이다. 결제가 없는
+      # 프로젝트에서는 모든 모델이 "limit: 0" 이라, 순회를 계속하면 같은 에러만 여러 줄 쌓인다.
+      if printf '%s' "$response" | grep -q 'RESOURCE_EXHAUSTED\|exceeded your current quota'; then
+        echo "Gemini 사용 한도가 없습니다 — 이 API 키의 프로젝트에 결제가 연결되어 있지 않으면" >&2
+        echo "모든 모델의 무료 한도가 0입니다. GitHub 검색으로 넘어갑니다." >&2
+        return 1
+      fi
+
       echo "  ($model / $tool 실패: ${last_error})" >&2
     done
   done
