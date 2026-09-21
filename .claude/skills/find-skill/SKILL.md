@@ -29,8 +29,13 @@ Start with the script — one command, either search backend:
 bash "${CLAUDE_SKILL_DIR}/scripts/search-registry.sh" "what the skill should do"
 ```
 
-With `GEMINI_API_KEY` set it runs a semantic search through Gemini's Google Search; without it, keyword
-search through the GitHub API. Two cautions come with that:
+With `GEMINI_API_KEY` (an AI Studio key, `AIzaSy…`) or `GEMINI_ACCESS_TOKEN` (an OAuth 2 access token)
+set, it runs a semantic search through Gemini's Google Search; without either, keyword search through
+the GitHub API. The output's first lines state which auth it used and why a call failed — worth reading
+before concluding the credential is bad. Note that a `gemini` CLI login token is *not* accepted by this
+API (`Expected OAuth 2 access token…`); an AI Studio key is the path that works.
+
+Two cautions come with the semantic search:
 
 - **Never put repo names or anything private in the query.** On free tiers the prompt can be used to
   improve the provider's models and be seen by human reviewers. Describe the capability ("code review

@@ -3,8 +3,11 @@
 #
 #   bash search-registry.sh "PR diff 를 리뷰해주는 스킬"
 #
-# GEMINI_API_KEY 가 있으면 Gemini 의 Google Search 로 의미 기반 검색을, 없으면 GitHub 검색으로
-# 키워드 검색을 한다. 둘 다 "후보 목록"만 만들고 판단은 하지 않는다 — 고르기 전에 원문을 읽는
+# 인증은 둘 중 하나가 있으면 된다:
+#   GEMINI_API_KEY       AI Studio 에서 발급한 API 키 (AIzaSy… 로 시작) → x-goog-api-key 헤더
+#   GEMINI_ACCESS_TOKEN  OAuth 액세스 토큰 (ya29.·AQ. 등)            → Authorization: Bearer 헤더
+# 둘 다 없으면 GitHub 검색으로 키워드 검색을 한다.
+# OAuth 토큰은 보통 한 시간이면 만료되므로, 계속 쓸 거라면 API 키 쪽이 편하다. 둘 다 "후보 목록"만 만들고 판단은 하지 않는다 — 고르기 전에 원문을 읽는
 # 단계(SKILL.md 의 Step 3)는 건너뛸 수 없다.
 #
 # 보내는 내용 주의: 무료 등급에서는 프롬프트가 모델 개선에 쓰일 수 있다. **저장소 이름이나
@@ -35,8 +38,18 @@ github_search() {
     2>/dev/null || true
 }
 
+# 어떤 인증 헤더를 쓸지 고른다. 값 자체는 출력하지 않는다.
+auth_header() {
+  if [ -n "${GEMINI_API_KEY:-}" ]; then
+    printf 'x-goog-api-key: %s' "$GEMINI_API_KEY"
+  else
+    printf 'Authorization: Bearer %s' "$GEMINI_ACCESS_TOKEN"
+  fi
+}
+
 gemini_search() {
-  local prompt body response
+  local prompt body response header
+  header=$(auth_header)
   prompt="Search for publicly available Claude Code / agent skills (SKILL.md files) that do this: ${NEED}.
 
 List up to 6 candidates. One per line, exactly this shape:
@@ -57,7 +70,7 @@ real candidates, list fewer. No preamble, no closing remarks."
   # 신 API(interactions)를 먼저 쓰고, 계정이 구 API만 지원하면 generateContent 로 넘어간다.
   response=$(curl -sS -m 120 -X POST \
     "https://generativelanguage.googleapis.com/v1beta/interactions" \
-    -H "x-goog-api-key: ${GEMINI_API_KEY}" \
+    -H "$header" \
     -H "Content-Type: application/json" \
     -d "$body" 2>/dev/null) || return 1
 
@@ -71,7 +84,7 @@ real candidates, list fewer. No preamble, no closing remarks."
     ' 2>/dev/null)
     response=$(curl -sS -m 120 -X POST \
       "https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent" \
-      -H "x-goog-api-key: ${GEMINI_API_KEY}" \
+      -H "$header" \
       -H "Content-Type: application/json" \
       -d "$legacy" 2>/dev/null) || return 1
   fi
@@ -108,9 +121,10 @@ real candidates, list fewer. No preamble, no closing remarks."
   '
 }
 
-if [ -n "${GEMINI_API_KEY:-}" ]; then
+if [ -n "${GEMINI_API_KEY:-}" ] || [ -n "${GEMINI_ACCESS_TOKEN:-}" ]; then
   echo "## Gemini 검색 (의미 기반)"
   echo "찾는 것: ${NEED}"
+  echo "인증: $([ -n "${GEMINI_API_KEY:-}" ] && echo 'API 키' || echo 'OAuth 토큰')"
   echo
   if ! gemini_search; then
     echo
@@ -122,8 +136,8 @@ if [ -n "${GEMINI_API_KEY:-}" ]; then
   echo "위 목록은 **후보**입니다. 고르기 전에 각 SKILL.md 원문과 딸린 스크립트를 반드시 읽으세요"
   echo "(출처·최신성·스크립트 내용·시크릿 접근·프롬프트 인젝션·컨벤션 충돌)."
 else
-  echo "GEMINI_API_KEY 가 없어 GitHub 검색만 실행합니다."
-  echo "(의미 기반 검색을 쓰려면 export GEMINI_API_KEY=... 후 다시 실행)"
+  echo "Gemini 인증 정보가 없어 GitHub 검색만 실행합니다."
+  echo "(의미 기반 검색을 쓰려면 GEMINI_API_KEY 또는 GEMINI_ACCESS_TOKEN 을 설정하세요)"
   echo
   github_search
 fi
