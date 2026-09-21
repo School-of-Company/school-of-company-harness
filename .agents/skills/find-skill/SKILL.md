@@ -55,7 +55,7 @@ someone else's repo; "it's from a big vendor" is not a substitute for reading it
 Rewrite so a reader can't tell it came from outside:
 
 - **Conventions are ours.** Strip the source's commit/PR format, labels, and any AI co-author line.
-  Our commit and PR rules live in `.claude/rules/commit-conventions.md`.
+  Our commit and PR rules live in `.agents/shared/commit-conventions.md`.
 - **No stack assumptions.** If it hardcodes a language, build tool, or branch name, make it detect the
   project instead — the same rule the rest of this catalog follows. A canned `--include="*.kt"` or an
   `origin/develop` is a bug here, not a detail.
@@ -83,5 +83,5 @@ Do not add a skill on your own judgment. Present the candidates and let the user
 ```
 
 Once the user picks, adapt it (Step 4), add the Codex mirror, and open a PR following
-`.claude/rules/commit-conventions.md`. Verify the result the way the rest of the catalog is verified:
+`.agents/shared/commit-conventions.md`. Verify the result the way the rest of the catalog is verified:
 the item shows up in `GET /catalog`, and the mirror differs only in the platform adaptations.

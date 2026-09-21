@@ -29,36 +29,9 @@ cat .github/PULL_REQUEST_TEMPLATE.md 2>/dev/null
 
 ## Step 3 — Learn This Project's Scope Vocabulary
 
-The scope belongs to **this** project's domains, not to a fixed list. Read what the repo already uses
-before inventing anything:
-
-```bash
-# scopes used in commit history:  feat(member): ... -> member
-git log --pretty=%s -200 | grep -oE '^[a-z]+\(([^)]+)\)' | sed -E 's/.*\((.*)\)/\1/' | sort | uniq -c | sort -rn
-# scopes used in past PR titles:  [member] ... -> member
-gh pr list --state all --limit 100 --json title -q '.[].title' | grep -oE '^\[[^]]+\]' | sort | uniq -c | sort -rn
-```
-
-**If the history shows a vocabulary, reuse it verbatim** — matching the project beats a more accurate
-word of your own, and a one-off scope makes the history unsearchable.
-
-If the history has none (new repo, or no convention yet), derive it from the paths you're touching:
-
-```bash
-git diff --name-only "origin/$BASE...HEAD"
-```
-
-Take the segment that names a domain or deployable unit, whatever this repo's layout calls it:
-
-| Layout | Path | Scope |
-|---|---|---|
-| Domain package | `src/main/kotlin/.../domain/member/...` | `member` |
-| Feature module | `src/expo/form/...`, `modules/expo/...` | `expo` |
-| Monorepo app | `apps/web/...`, `packages/ui/...` | `web`, `ui` |
-| Flat project | `src/services/payment.ts` | `payment` |
-
-Prefer the domain over the layer — `member` tells a reviewer more than `service` or `controller`. If the
-change spans several scopes, use `global`; for build/CI-only changes, `ci`.
+Read `.agents/shared/commit-conventions.md` — it holds the commands for reading the repo's existing
+scope vocabulary, the fallback for deriving one from the changed paths, and the title format. It ships
+with this skill, so it is always present.
 
 ## Step 4 — Determine Labels
 
@@ -70,8 +43,6 @@ gh label list --limit 100
 
 Pick **1–2** by meaning, using `.agents/skills/write-pr/references/labels.md` as the mapping guide. If nothing
 matches, attach none — a wrong label is worse than no label, and an undefined one fails PR creation.
-
-Read `.agents/skills/write-pr/references/commit-conventions.md` for type and scope naming rules.
 
 ## Step 5 — Generate PR Content
 

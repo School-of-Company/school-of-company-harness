@@ -4,19 +4,13 @@ description: Create Git commits following this project's Conventional Commits st
 allowed-tools: Bash
 ---
 
-## Step 0 — Read the Project's Own Rules First
+## Step 1 — Read the Conventions
 
-If this repo states its own commit format, that wins over everything below. Read it before writing a
-message:
+Read `.claude/shared/commit-conventions.md` in full before writing any message. It holds the message
+format, how to choose the scope from what the repo already uses, and the rule that the target repo's own
+`CLAUDE.md` wins over all of it. It ships with this skill, so it is always present.
 
-```bash
-ls CLAUDE.md AGENTS.md CONTRIBUTING.md 2>/dev/null
-find .claude/rules -name "*.md" 2>/dev/null
-```
-
-Read whatever exists. Use the rules below only where the repo is silent.
-
-## Step 1 — Find the Integration Branch
+## Step 2 — Find the Integration Branch
 
 Don't assume `develop` or `main` — projects here use both. Ask the repo:
 
@@ -37,40 +31,6 @@ Create one first:
 3. `git checkout -b <type>/<inferred-name>`
 
 **If the current branch is not `BASE`:** go straight to the commit flow.
-
-## Step 2 — Learn the Project's Scope Vocabulary
-
-The scope is this project's own domain vocabulary, not a fixed list. Read what the repo already uses:
-
-```bash
-git log --pretty=%s -200 | grep -oE '^[a-z]+\(([^)]+)\)' | sed -E 's/.*\((.*)\)/\1/' | sort | uniq -c | sort -rn
-```
-
-**If the history shows a vocabulary, reuse it verbatim** — matching the project beats a more accurate
-word of your own, and a one-off scope makes the history unsearchable.
-
-If it has none (new repo, or no convention yet), derive it from the paths you're touching:
-
-| Layout          | Path                                    | Scope          |
-| --------------- | --------------------------------------- | -------------- |
-| Domain package  | `src/main/kotlin/.../domain/member/...`  | `member`       |
-| Feature module  | `src/expo/form/...`, `modules/expo/...`  | `expo`         |
-| Monorepo app    | `apps/web/...`, `packages/ui/...`        | `web`, `ui`    |
-| Flat project    | `src/services/payment.ts`                | `payment`      |
-
-Prefer the domain over the layer — `member` tells a reviewer more than `service` or `controller`. If the
-change spans several scopes, use `global`; for build/CI-only changes, `ci`.
-
-## Commit Message Rules
-
-Format: `type(scope): description`
-
-- **Type**: `feat` / `fix` / `refactor` / `docs` / `chore` / `test`
-- **Scope**: from Step 2
-- **Description**: 한글, 명사형 종결, 마침표 없음
-  - Good: `레포 선택 드롭다운 구현`, `PR 생성 시 base branch 조회 실패 처리`
-- Subject line only (no body) — breaking change일 때만 예외적으로 본문에 `BREAKING CHANGE: <설명>` 추가
-- Do NOT add AI as co-author
 
 ## Commit Flow
 
