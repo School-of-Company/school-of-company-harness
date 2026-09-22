@@ -42,6 +42,10 @@ Every item is mirrored for Codex unless it's genuinely Claude-only:
 
 Codex skills are not a byte-for-byte copy — apply these mechanical changes when mirroring:
 
+- Codex has no subagents. A Claude skill that fans work out with the `Agent` tool becomes sequential
+  passes in the mirror — keep the *structure* (same lenses, same verification), drop the parallelism,
+  and say in the mirror that the Claude version fans out. Don't leave `Agent` in `allowed-tools`
+
 - Replace `${CLAUDE_SKILL_DIR}` with the literal path (`.agents/skills/<name>/...`) — Codex doesn't expand
   that variable
 - Drop frontmatter fields Codex doesn't support: `disable-model-invocation`
@@ -92,6 +96,21 @@ fully independent systems — enabling one does not enable the other.
     recurring; it's also idempotent, so a repo that already has our wiring sees no diff at all.
   - `.codex/hooks.json` is a fixed dispatcher-wiring file (no per-project custom keys observed so far) — copy
     it as-is alongside `.codex/hooks/dispatcher/` when any Codex hook module is selected.
+
+## Subagents in Skills
+
+A skill may fan work out to subagents (`Agent` tool, `subagent_type: "general-purpose"` — a target repo
+has no custom agent types defined). Two conditions before reaching for it:
+
+- **There must be separate lenses, not just volume.** The gain is that one context holds one question;
+  four concerns in one pass get reviewed shallowly. Splitting the same question across agents only
+  multiplies cost.
+- **The skill must still work without them.** Some setups have no `general-purpose` type, and `Agent`
+  can be absent from the tool set — so every such skill states a single-context fallback.
+
+Treat what comes back as **claims to verify, not results**: confirm each finding against the cited
+`file:line`, confirm it's inside the diff under review, and merge duplicates. Claude Code scans subagent
+output for instruction-shaped text before you see it, but that doesn't make the content correct.
 
 ## PR Diff Scope
 
