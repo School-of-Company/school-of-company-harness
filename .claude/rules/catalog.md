@@ -17,6 +17,13 @@ is the catalog metadata — commit a file to the right location and the web app 
 - **Claude hook module**: `.claude/hooks/modules/<name>/preToolUse.sh` or `postToolUse.sh`
   - `exit 2` = block the tool call, `exit 0` = pass through
   - Hooks never work standalone — see "Catalog Item Dependency Rule" below
+  - **Guard modules block by reversibility, not by how alarming a command looks.** `rm -rf dist` is a
+    rebuild away; `rm -rf .` is not. `git push --force-with-lease` cannot overwrite someone else's
+    commit; bare `--force` can. A guard that blocks the safe cases gets switched off, and then the
+    dangerous ones are open too — so match on the path and the flag, not on the command name.
+  - **Secrets leak in both directions.** `secret-guard` checks content on the way into a file *and*
+    blocks reading `.env`/key files through Bash — one `cat .env` puts the values in the transcript and
+    the logs, which is the more common leak of the two.
   - **One module per tool, and it must detect its own tool before acting.** A linter module checks for
     that linter's config/declaration and exits 0 when absent, so installing it into a project that uses
     a different tool is harmless. What that safety hides is the reverse case: a project using `oxlint`
