@@ -17,12 +17,29 @@ find .claude/rules -name "*.md" 2>/dev/null
 
 `type(scope): description`
 
-- **Type**: `feat` / `fix` / `refactor` / `docs` / `chore` / `test`
+- **Type**: see "Choosing the Type" below
 - **Scope**: see "Choosing the Scope" below
 - **Description**: 한글, 명사형 종결, 마침표 없음
   - Good: `레포 선택 드롭다운 구현`, `PR 생성 시 base branch 조회 실패 처리`
 - Subject line only (no body) — except for a breaking change, which gets a `BREAKING CHANGE: <설명>` body
 - Never add AI as a co-author
+
+## Choosing the Type
+
+Read the repo's own type vocabulary before reaching for the Conventional Commits set:
+
+```bash
+git log --pretty=%s -300 | grep -oE '^[a-z]+' | sort | uniq -c | sort -rn | head
+```
+
+**Use what comes back.** `feat` / `fix` / `refactor` / `docs` / `chore` / `test` is the fallback for a
+repo with no history to read, not the answer. Repos diverge from that set more often than they follow
+it — one repo here leads with `update` and has no `feat` at all, another leads with `add`, and others
+carry `style`, `ui`, `translate`, `delete` or `build`. Writing `feat` into a history like that invents a
+convention rather than following one.
+
+Pick the type whose existing commits most resemble the change at hand, and read a few of them when the
+name is ambiguous — `update` versus `fix` is split differently in every repo that uses both.
 
 ## Choosing the Scope
 
