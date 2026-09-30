@@ -4,33 +4,46 @@ description: Create Git commits following this project's Conventional Commits st
 allowed-tools: Bash
 ---
 
-## Step 1 — Read the Conventions
+## Step 0 — Branch Check (Required)
 
-Read `.claude/shared/commit-conventions.md` in full before writing any message. It holds the message
-format, how to choose the scope from what the repo already uses, and the rule that the target repo's own
-`CLAUDE.md` wins over all of it. It ships with this skill, so it is always present.
-
-## Step 2 — Find the Integration Branch
-
-Don't assume `develop` or `main` — projects here use both. Ask the repo:
+Never commit onto a shared branch. Which branch that is differs per project, so **ask the repo** instead
+of assuming `develop` (checking only for `develop` means committing straight onto `main` in a
+trunk-based repo — the exact mistake this step exists to prevent):
 
 ```bash
 git branch --show-current
 gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null
-git ls-remote --heads origin develop development dev | sed 's#.*refs/heads/##'
+git ls-remote --heads origin develop development dev 2>/dev/null | sed 's#.*refs/heads/##'
 ```
 
-`BASE` is the integration branch if the remote has one, otherwise the default branch.
+The shared branches are the default branch plus any integration branch the remote has.
 
-**If the current branch is `BASE`**, work doesn't get committed there — it arrives through a branch.
-Create one first:
+**If the current branch is one of them:**
 
 1. Analyze all changes with `git status` and `git diff`
-2. Infer the name from the changes: `<type>/<kebab-case-description>`, using the same type as the
-   planned commit — `feat/repo-select-dropdown`, `fix/base-branch-check`
-3. `git checkout -b <type>/<inferred-name>`
+2. Infer a branch name from the changes:
+   - Format: `<type>/<kebab-case-description>` — same type as the planned commit
+   - Specific enough to identify the work: `feat/repo-select-dropdown`, `fix/base-branch-check`,
+     never `update` or `changes`
+3. Branch off the **remote** tip, so you don't inherit a stale local state:
+   ```bash
+   git fetch origin <shared-branch> --quiet
+   git checkout -b <type>/<inferred-name> "origin/<shared-branch>"
+   ```
+   Use the integration branch when the repo has one, otherwise the default branch.
+4. Proceed with the commit flow below
 
-**If the current branch is not `BASE`:** go straight to the commit flow.
+**Otherwise** (already on a work branch): proceed directly to the commit flow. Don't reuse a branch
+that belongs to work someone already merged — start a new one.
+
+---
+
+## Commit Message Rules
+
+Read `.claude/shared/commit-conventions.md` in full before writing any message. It holds the type and
+scope vocabulary — both read off this repo's own history rather than a fixed list — the description
+format, and the rule that the repo's own `CLAUDE.md` wins over all of it. It ships with this skill, so
+it is always present.
 
 ## Commit Flow
 
@@ -45,5 +58,4 @@ Create one first:
    - `git commit -m "message"`
 4. Verify with `git log --oneline -n <count>`
 
-> **Rule**: One logical change = One commit. Files that must change together belong in the same commit.
-> Unrelated changes must be split.
+> **Rule**: One logical change = One commit. Files that must change together belong in the same commit. Unrelated changes must be split.

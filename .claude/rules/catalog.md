@@ -17,6 +17,13 @@ is the catalog metadata — commit a file to the right location and the web app 
 - **Claude hook module**: `.claude/hooks/modules/<name>/preToolUse.sh` or `postToolUse.sh`
   - `exit 2` = block the tool call, `exit 0` = pass through
   - Hooks never work standalone — see "Catalog Item Dependency Rule" below
+  - **Guard modules block by reversibility, not by how alarming a command looks.** `rm -rf dist` is a
+    rebuild away; `rm -rf .` is not. `git push --force-with-lease` cannot overwrite someone else's
+    commit; bare `--force` can. A guard that blocks the safe cases gets switched off, and then the
+    dangerous ones are open too — so match on the path and the flag, not on the command name.
+  - **Secrets leak in both directions.** `secret-guard` checks content on the way into a file *and*
+    blocks reading `.env`/key files through Bash — one `cat .env` puts the values in the transcript and
+    the logs, which is the more common leak of the two.
   - **One module per tool, and it must detect its own tool before acting.** A linter module checks for
     that linter's config/declaration and exits 0 when absent, so installing it into a project that uses
     a different tool is harmless. What that safety hides is the reverse case: a project using `oxlint`
@@ -34,6 +41,10 @@ Every item is mirrored for Codex unless it's genuinely Claude-only:
 ## Claude → Codex Skill Adaptation
 
 Codex skills are not a byte-for-byte copy — apply these mechanical changes when mirroring:
+
+- Codex has no subagents. A Claude skill that fans work out with the `Agent` tool becomes sequential
+  passes in the mirror — keep the *structure* (same lenses, same verification), drop the parallelism,
+  and say in the mirror that the Claude version fans out. Don't leave `Agent` in `allowed-tools`
 
 - Replace `${CLAUDE_SKILL_DIR}` with the literal path (`.agents/skills/<name>/...`) — Codex doesn't expand
   that variable
@@ -105,6 +116,21 @@ and they drifted. `write-pr` was fixed to read the scope vocabulary off the targ
 `git-commit` kept a hardcoded list still containing a scope this repo had retired, so a repo that
 installed both got commits and PRs with different vocabularies. One copy, pulled in by whoever
 references it, is what keeps that from recurring.
+
+## Subagents in Skills
+
+A skill may fan work out to subagents (`Agent` tool, `subagent_type: "general-purpose"` — a target repo
+has no custom agent types defined). Two conditions before reaching for it:
+
+- **There must be separate lenses, not just volume.** The gain is that one context holds one question;
+  four concerns in one pass get reviewed shallowly. Splitting the same question across agents only
+  multiplies cost.
+- **The skill must still work without them.** Some setups have no `general-purpose` type, and `Agent`
+  can be absent from the tool set — so every such skill states a single-context fallback.
+
+Treat what comes back as **claims to verify, not results**: confirm each finding against the cited
+`file:line`, confirm it's inside the diff under review, and merge duplicates. Claude Code scans subagent
+output for instruction-shaped text before you see it, but that doesn't make the content correct.
 
 ## PR Diff Scope
 
