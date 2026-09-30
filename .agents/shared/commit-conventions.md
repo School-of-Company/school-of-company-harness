@@ -15,7 +15,16 @@ find .claude/rules -name "*.md" 2>/dev/null
 
 ## Commit Message Format
 
-`type(scope): description`
+`type(scope): description` — **unless the repo writes them differently.** Check the shape before the
+vocabulary; not every repo uses Conventional Commits at all:
+
+```bash
+git log --pretty=%s -20
+```
+
+One School-of-Company repo writes `update :: 엑셀 메모리 성능 개선` — a different separator, no scope,
+120 commits deep. Matching a repo's existing shape matters more than importing this one, so if the
+history is consistent and different, follow it and skip the rest of this section.
 
 - **Type**: see "Choosing the Type" below
 - **Scope**: see "Choosing the Scope" below
