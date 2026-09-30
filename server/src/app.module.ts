@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { InstallationTokenModule } from './installation-token/installation-token.module.js';
+import { RecommendationModule } from './recommendation/recommendation.module.js';
 import { ReposModule } from './repos/repos.module.js';
 import { CatalogModule } from './catalog/catalog.module.js';
 import { PrModule } from './pr/pr.module.js';
@@ -22,6 +23,7 @@ import { PrModule } from './pr/pr.module.js';
     ConfigModule.forRoot({ isGlobal: true }),
     InstallationTokenModule,
     ReposModule,
+    RecommendationModule,
     CatalogModule,
     PrModule,
   ],
