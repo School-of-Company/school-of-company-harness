@@ -10,18 +10,21 @@ allowed-tools: Bash(bash *get-pr-data.sh:*), Bash(gh api:*), Bash(gh pr view:*),
 bash .agents/skills/resolve-reviews/scripts/get-pr-data.sh
 ```
 
+The script prints `PR_TMP_DIR=<path>` on its last line — every file below lives in that
+directory, which is outside the repo so it can never be swept into a commit.
+
 Output files:
 
-- `.pr-tmp/pr_comments.json` — inline review comments (id, path, line, body, created_at, user).
+- `$PR_TMP_DIR/pr_comments.json` — inline review comments (id, path, line, body, created_at, user).
   Replies are filtered out (`in_reply_to_id == null`), so the replies this skill posted on an earlier
   run don't come back as comments to assess.
-- `.pr-tmp/pr_reviews.json` — PR-level review bodies (id, state, body, submitted_at, user). Bot
+- `$PR_TMP_DIR/pr_reviews.json` — PR-level review bodies (id, state, body, submitted_at, user). Bot
   reviewers post their findings here rather than inline, so a run that reads only `pr_comments.json`
   sees nothing from them.
-- `.pr-tmp/last_push.txt` — timestamp of the last push; anything newer is this round's feedback
-- `.pr-tmp/pr_changed_files.txt` — changed files
-- `.pr-tmp/pr_commits.txt` — commits in this PR
-- `.pr-tmp/pr_diff.txt` — full diff
+- `$PR_TMP_DIR/last_push.txt` — timestamp of the last push; anything newer is this round's feedback
+- `$PR_TMP_DIR/pr_changed_files.txt` — changed files
+- `$PR_TMP_DIR/pr_commits.txt` — commits in this PR
+- `$PR_TMP_DIR/pr_diff.txt` — full diff
 
 Assess both `pr_comments.json` and `pr_reviews.json`. Compare each entry's `created_at` /
 `submitted_at` against `last_push.txt`: newer entries are this round's, older ones are from a previous
@@ -140,5 +143,5 @@ For reply body templates, read `.agents/skills/resolve-reviews/references/reply-
 ## Step 7 — Cleanup
 
 ```bash
-rm -rf .pr-tmp
+rm -rf "$PR_TMP_DIR"
 ```
