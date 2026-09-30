@@ -1,9 +1,23 @@
 ---
 name: nestjs-arch
-description: NestJS project architecture and conventions for this team — module structure and file naming, interface-token dependency injection, @nestjs/config for settings, DTO classes for every controller and service argument, ValidationPipe for request shape, store pattern, logging, thin controllers, consumer error handling, and constructor-injected unit tests. Use when creating or modifying NestJS modules, services, controllers, DTOs, providers, or their tests.
+description: Architecture reference for NestJS (TypeScript) projects — module structure and file naming, interface-token dependency injection, @nestjs/config for settings, DTO classes for every controller and service argument, ValidationPipe for request shape, store pattern, logging, thin controllers, consumer error handling, and constructor-injected unit tests. Use when creating or modifying NestJS modules, services, controllers, DTOs, providers, or their tests.
 ---
 
 # NestJS Architecture
+
+## Applies To
+
+NestJS (TypeScript). **Check before using any of it** — items are picked by hand on a dashboard, and
+Spring-side architecture skills have landed in Node repos and vice versa:
+
+```bash
+ls package.json build.gradle.kts pom.xml 2>/dev/null
+grep -l '@nestjs/core' package.json 2>/dev/null
+```
+
+If the project is Spring instead, use `kotlin-spring-arch` or `java-spring-arch`. When it's a Node
+project without NestJS, say so rather than applying the module/provider patterns below — they are
+NestJS's DI container, not general TypeScript advice.
 
 ## Rules
 

@@ -5,6 +5,21 @@ description: Architecture reference for Java + Spring Boot 4.0 projects — Cont
 
 # Java + Spring Boot Architecture Guide
 
+## Applies To
+
+Java + Spring Boot. **Check before using any of it** — items are picked by hand on a dashboard, and this
+one has landed in Kotlin and Node repos:
+
+```bash
+ls pom.xml build.gradle build.gradle.kts package.json 2>/dev/null
+ls -d src/main/java src/main/kotlin 2>/dev/null
+```
+
+If `src/main/kotlin` or a `.kts` build file is what's there, this is a Kotlin project — use
+`kotlin-spring-arch`. If it's `package.json` with NestJS, use `nestjs-arch`. When neither of those is
+installed, say this guidance doesn't apply instead of translating it: the patterns below assume
+checked exceptions, `Optional`, and getter/setter DTOs, none of which survive the trip intact.
+
 ## Layer Structure
 
 ### Controller
