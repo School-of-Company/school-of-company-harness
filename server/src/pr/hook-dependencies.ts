@@ -1,3 +1,4 @@
+import { BadGatewayException, ConflictException } from '@nestjs/common';
 import type { Octokit } from '@octokit/rest';
 import type { CatalogItem } from '../catalog/catalog.types.js';
 import { readCatalogFile, type CollectedFile } from './file-collector.js';
@@ -50,11 +51,17 @@ export async function resolveHookDependencies(
     files.push(
       {
         path: '.codex/hooks/dispatcher/pre-tool-use.sh',
-        content: readCatalogFile('.codex/hooks/dispatcher/pre-tool-use.sh', catalogRoot),
+        content: readCatalogFile(
+          '.codex/hooks/dispatcher/pre-tool-use.sh',
+          catalogRoot,
+        ),
       },
       {
         path: '.codex/hooks/dispatcher/post-tool-use.sh',
-        content: readCatalogFile('.codex/hooks/dispatcher/post-tool-use.sh', catalogRoot),
+        content: readCatalogFile(
+          '.codex/hooks/dispatcher/post-tool-use.sh',
+          catalogRoot,
+        ),
       },
       // Codex의 wiring 파일은 프로젝트별로 달라질 부분이 없는 고정 내용이라 그대로 복사한다.
       {
@@ -82,25 +89,18 @@ export async function resolveHookDependencies(
  * 3번이 얕은 병합이면 안 되는 이유는 `settings-merge.ts`에 적어 두었다: `hooks` 키를 통째로
  * 갈아끼우면 대상 레포가 직접 넣은 훅 항목이 조용히 사라진다.
  */
-async function buildClaudeSettings(
+export async function buildClaudeSettings(
   octokit: Octokit,
   owner: string,
   repo: string,
   catalogRoot: string,
 ): Promise<CollectedFile> {
-  let base: Record<string, unknown>;
-  try {
-    const { data } = await octokit.rest.repos.getContent({
-      owner,
-      repo,
-      path: '.claude/settings.json',
-    });
-    // 경로가 디렉터리면 `content`가 없다 — 그 경우도 템플릿 폴백으로 넘긴다.
-    if (!('content' in data)) throw new Error('not a file');
-    base = JSON.parse(Buffer.from(data.content, 'base64').toString('utf-8'));
-  } catch {
-    base = JSON.parse(readCatalogFile('.claude/templates/settings-base.json', catalogRoot));
-  }
+  const existing = await fetchExistingSettings(octokit, owner, repo);
+  const base: Record<string, unknown> =
+    existing ??
+    JSON.parse(
+      readCatalogFile('.claude/templates/settings-base.json', catalogRoot),
+    );
 
   const hooksFragment = JSON.parse(
     readCatalogFile('.claude/templates/settings-hooks.json', catalogRoot),
@@ -111,4 +111,53 @@ async function buildClaudeSettings(
     path: '.claude/settings.json',
     content: JSON.stringify(merged, null, 2),
   };
+}
+
+/**
+ * 대상 레포의 `.claude/settings.json`을 읽는다. 없으면(404) `undefined` — 호출자가 템플릿으로 시작한다.
+ *
+ * **404만 "없음"으로 취급한다.** 예전에는 모든 에러를 템플릿 폴백으로 처리했는데, 403·429·타임아웃이나
+ * 깨진 JSON에서도 템플릿이 base가 되어 대상 레포의 기존 `permissions` 등이 PR에서 조용히 덮어써졌다.
+ * 읽지 못한 것과 없는 것은 다르므로, 읽지 못했다면 PR을 만들지 않고 사유를 알린다.
+ */
+async function fetchExistingSettings(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+): Promise<Record<string, unknown> | undefined> {
+  const path = '.claude/settings.json';
+  let data: Awaited<ReturnType<Octokit['rest']['repos']['getContent']>>['data'];
+  try {
+    ({ data } = await octokit.rest.repos.getContent({ owner, repo, path }));
+  } catch (error: unknown) {
+    if ((error as { status?: number }).status === 404) return undefined;
+    throw new BadGatewayException(
+      `${owner}/${repo}의 ${path}를 읽지 못했습니다. 기존 설정을 덮어쓸 수 있어 PR을 만들지 않았습니다. 잠시 후 다시 시도하세요.`,
+    );
+  }
+
+  // 디렉터리(배열 응답)·심볼릭 링크 등 일반 파일이 아니면 병합할 대상이 없다.
+  if (Array.isArray(data) || !('content' in data)) {
+    throw new ConflictException(
+      `${owner}/${repo}의 ${path}가 일반 파일이 아닙니다. 확인 후 다시 시도하세요.`,
+    );
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(
+      Buffer.from(data.content, 'base64').toString('utf-8'),
+    );
+    if (
+      parsed === null ||
+      typeof parsed !== 'object' ||
+      Array.isArray(parsed)
+    ) {
+      throw new Error('not an object');
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    throw new ConflictException(
+      `${owner}/${repo}의 ${path}가 올바른 JSON 객체가 아닙니다. 병합하면 기존 설정이 사라질 수 있어 PR을 만들지 않았습니다. 파일을 고친 뒤 다시 시도하세요.`,
+    );
+  }
 }
