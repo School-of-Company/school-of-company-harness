@@ -120,13 +120,18 @@ references it, is what keeps that from recurring.
 ## Subagents in Skills
 
 A skill may fan work out to subagents (`Agent` tool, `subagent_type: "general-purpose"` — a target repo
-has no custom agent types defined). Two conditions before reaching for it:
+has no custom agent types defined). Three conditions before reaching for it:
 
 - **There must be separate lenses, not just volume.** The gain is that one context holds one question;
   four concerns in one pass get reviewed shallowly. Splitting the same question across agents only
   multiplies cost.
 - **The skill must still work without them.** Some setups have no `general-purpose` type, and `Agent`
   can be absent from the tool set — so every such skill states a single-context fallback.
+- **The input cost is multiplied by the agent count, so cap it.** Every subagent re-reads the same
+  material in its own context. A skill that fans out states a size threshold below which it works
+  directly, spawns only the lenses that apply, passes pointers (a diff range, file paths) instead of
+  pasted content, names `model: "sonnet"` for focused reads, and caps each reply's length — the tokens
+  spent on a subagent's answer come back into the main context too.
 
 Treat what comes back as **claims to verify, not results**: confirm each finding against the cited
 `file:line`, confirm it's inside the diff under review, and merge duplicates. Claude Code scans subagent
