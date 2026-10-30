@@ -72,7 +72,7 @@ Flag when:
 For agent `.md` files with frontmatter:
 - All required fields present? (`name`, `description`, `tools`, `model`, `color`, `memory`, `maxTurns`, `permissionMode`)
 - `model` is one of: `haiku`, `sonnet`, `opus`
-- `color` is one of: `green`, `yellow`, `pink`, `blue`, `orange`, `red`, `purple`
+- `color` is one of: `green`, `yellow`, `pink`, `blue`, `orange`, `red`, `purple`, `cyan`
 - Body follows a logical flow: Role statement → Context/Scope → Steps → Output Format → Constraints
 
 For skill `SKILL.md` files:

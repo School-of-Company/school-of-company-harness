@@ -8,6 +8,9 @@ allowed-tools: Agent, Bash(git *:*), Bash(grep *:*), Bash(ls *:*), Bash(find *:*
 
 ## Step 1 — Gather the Diff and This Project's Rules
 
+`BASE` is the repo's integration branch if it has one, otherwise its default branch — find it the way
+the `write-pr` skill's Step 1 does instead of assuming `develop` or `main`.
+
 ```bash
 git branch --show-current
 git diff --stat                          # uncommitted
