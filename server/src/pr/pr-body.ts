@@ -115,9 +115,15 @@ function summarize(selectedItems: CatalogItem[]): string {
  * `하네스 동기화`를 앞에 세우고 내용을 뒤에 붙인다. 이 PR을 받는 저장소에는 사람이 직접 만든
  * PR이 섞여 있으므로, 목록에서 "하네스가 보낸 것"이 한눈에 구분되는 편이 낫다. 대신 정보가
  * 없는 꼬리말("~ 추가")은 떼고, 무엇이 들어왔는지가 바로 오게 했다.
+ *
+ * `[global]` 같은 범위 접두어는 붙이지 않는다. 대상 레포 중에는 PR 제목 검사를 CI로 거는 곳이 있고
+ * (Expo 계열 일부), 그 규칙이 "범위 접두어·이모지 없이 50자 이하"라서 접두어가 있으면 검사가
+ * 실패한다. 다른 레포의 제목 관례는 제각각이라(`[scope]`, `feat ::`, 없음) 가장 엄격한 쪽에 맞추면
+ * 어디서도 걸리지 않는다. 자동 갱신으로 같은 레포에 반복해서 PR이 열리는 만큼, 실패하는 PR이
+ * 매번 생기는 일은 막아야 한다.
  */
 export function buildPrTitle(selectedItems: CatalogItem[]): string {
-  return `[global] 하네스 동기화 — ${summarize(selectedItems)}`;
+  return `하네스 동기화 — ${summarize(selectedItems)}`;
 }
 
 /**

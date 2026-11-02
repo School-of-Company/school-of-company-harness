@@ -160,13 +160,14 @@ dependencies** (see "Catalog Item Dependency Rule") — nothing else in the targ
 
 ## PR Title & Base Branch
 
-- Title reuses the same bracket convention as our own repo's PRs, with a fixed `[global]` scope (these
-  PRs land on other repos and touch their tooling as a whole, not one of their domains) and a fixed
-  `하네스 동기화 —` prefix, then what was included:
+- Title is a fixed `하네스 동기화 —` prefix, then what was included. It carries **no `[scope]` prefix**:
+  some target repos run a CI title check ("no scope prefix, no emoji, at most 50 characters") and every
+  other repo's convention differs (`[scope]`, `feat ::`, none), so the strictest rule is the one that
+  passes everywhere. A title that fails a repo's check opens a red PR there each time the harness runs.
 
   ```
-  [global] 하네스 동기화 — 스킬 10 · 에이전트 4 · 훅 5
-  [global] 하네스 동기화 — test 스킬
+  하네스 동기화 — 스킬 10 · 에이전트 4 · 훅 5
+  하네스 동기화 — test 스킬
   ```
 
   One item is named outright; several collapse to per-group counts joined with ` · `. The prefix is there
