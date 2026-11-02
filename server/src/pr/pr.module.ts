@@ -11,5 +11,6 @@ import { PrService } from './pr.service.js';
   imports: [CatalogModule],
   controllers: [PrController],
   providers: [PrService],
+  exports: [PrService],
 })
 export class PrModule {}

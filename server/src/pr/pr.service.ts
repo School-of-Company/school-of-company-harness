@@ -8,7 +8,9 @@ import {
   INSTALLATION_TOKEN_MANAGER,
   type InstallationTokenManager,
 } from '../installation-token/installation-token-manager.interface.js';
+import type { Octokit } from '@octokit/rest';
 import { CatalogService } from '../catalog/catalog.service.js';
+import type { CatalogItem } from '../catalog/catalog.types.js';
 import { collectFiles, type CollectedFile } from './file-collector.js';
 import { resolveHookDependencies } from './hook-dependencies.js';
 import {
@@ -18,6 +20,39 @@ import {
 import { buildCommitMessage, buildPrBody, buildPrTitle } from './pr-body.js';
 import { classifyFiles, modeFor } from './tree-diff.js';
 import { CreatePrRequestDto, CreatePrResponseDto } from './pr.dto.js';
+
+/**
+ * 고른 항목이 모두 대상 레포에 이미 반영돼 있어 올릴 파일이 없는 경우.
+ *
+ * `ConflictException`(409)을 상속하므로 `POST /pr`의 응답은 그대로이고, 일괄 업데이트처럼
+ * "변경 없음"을 오류가 아닌 정상 결과로 다뤄야 하는 호출자는 메시지 문자열 대신 이 클래스로 구분한다.
+ */
+export class AlreadyUpToDateException extends ConflictException {}
+
+/**
+ * `plan()`의 결과 — 대상 레포를 읽어 "무엇이 바뀌는지"까지 계산했고, 아직 아무것도 쓰지 않은 상태.
+ * `open()`이 이 값으로 커밋·브랜치·PR을 만든다.
+ */
+export interface PrPlan {
+  octokit: Octokit;
+  owner: string;
+  repo: string;
+  baseBranch: string;
+  /** base 브랜치가 가리키는 커밋 SHA — 새 커밋의 부모가 된다. */
+  baseSha: string;
+  /** 그 커밋의 tree SHA — `createTree`의 `base_tree`. */
+  baseTreeSha: string;
+  /** 실제로 올라갈 파일(대상과 같은 내용인 파일은 이미 빠져 있다). 비어 있으면 올릴 것이 없다. */
+  files: CollectedFile[];
+  changedItems: CatalogItem[];
+  upToDateItems: CatalogItem[];
+  sharedByItem: Map<string, string[]>;
+}
+
+export interface OpenPrOptions {
+  /** 이미 쓰고 있는 항목의 최신본을 보내는 PR이면 true — 본문에 덮어쓰기 안내가 붙는다. */
+  update?: boolean;
+}
 
 @Injectable()
 export class PrService {
@@ -57,7 +92,25 @@ export class PrService {
    * 그건 호출당 커밋 하나가 생긴다. 여기선 여러 파일을 **한 커밋**으로 묶어야 해서 저수준
    * git data API를 쓴다.
    */
-  async createPr(dto: CreatePrRequestDto): Promise<CreatePrResponseDto> {
+  async createPr(
+    dto: CreatePrRequestDto,
+    options: OpenPrOptions = {},
+  ): Promise<CreatePrResponseDto> {
+    const plan = await this.plan(dto);
+    if (plan.files.length === 0) {
+      throw new AlreadyUpToDateException(
+        `${plan.owner}/${plan.repo}의 ${plan.baseBranch} 브랜치는 선택한 항목이 모두 최신입니다. 변경할 내용이 없어 PR을 만들지 않았습니다.`,
+      );
+    }
+    return this.open(plan, options);
+  }
+
+  /**
+   * 대상 레포를 읽어 올릴 파일을 계산한다 (위 1~2단계 + 변경 감지). 아무것도 쓰지 않으므로
+   * 일괄 업데이트의 dry-run이 이 메서드만 호출해 "무엇이 바뀔지"를 보여줄 수 있다.
+   * 올릴 파일이 없어도 던지지 않는다 — 그 판단은 호출자 몫이다.
+   */
+  async plan(dto: CreatePrRequestDto): Promise<PrPlan> {
     const { owner, repo, installationId, baseBranch, itemIds } = dto;
 
     // 웹에서 넘어온 id를 실제 카탈로그 항목으로 해석한다. 모르는 id는 그냥 throw
@@ -172,17 +225,43 @@ export class PrService {
       ...changedDependencyFiles,
     ];
 
-    if (files.length === 0) {
-      throw new ConflictException(
-        `${owner}/${repo}의 ${baseBranch} 브랜치는 선택한 항목이 모두 최신입니다. 변경할 내용이 없어 PR을 만들지 않았습니다.`,
-      );
-    }
+    return {
+      octokit,
+      owner,
+      repo,
+      baseBranch,
+      baseSha: baseRef.data.object.sha,
+      baseTreeSha: baseCommit.data.tree.sha,
+      files,
+      changedItems,
+      upToDateItems,
+      sharedByItem,
+    };
+  }
+
+  /** `plan()`이 계산한 파일로 커밋·브랜치·PR을 만든다 (위 3~6단계). */
+  async open(
+    plan: PrPlan,
+    options: OpenPrOptions = {},
+  ): Promise<CreatePrResponseDto> {
+    const {
+      octokit,
+      owner,
+      repo,
+      baseBranch,
+      baseSha,
+      baseTreeSha,
+      files,
+      changedItems,
+      upToDateItems,
+      sharedByItem,
+    } = plan;
 
     // 3) 기존 스냅샷 위에 바뀐 파일만 얹은 새 tree
     const newTree = await octokit.rest.git.createTree({
       owner,
       repo,
-      base_tree: baseCommit.data.tree.sha,
+      base_tree: baseTreeSha,
       tree: files.map((file) => ({
         path: file.path,
         // 훅 스크립트는 실행 권한이 있어야 한다 — `settings.json`이 경로를 명령으로 직접 실행한다.
@@ -198,7 +277,7 @@ export class PrService {
       repo,
       message: buildCommitMessage(changedItems),
       tree: newTree.data.sha,
-      parents: [baseRef.data.object.sha],
+      parents: [baseSha],
     });
 
     // 5) 그 커밋을 가리키는 새 브랜치. 타임스탬프를 붙여 실행마다 유일한 이름을 만들어,
@@ -218,11 +297,9 @@ export class PrService {
       title: buildPrTitle(changedItems),
       head: branchName,
       base: baseBranch,
-      body: buildPrBody(changedItems, upToDateItems, sharedByItem),
+      body: buildPrBody(changedItems, upToDateItems, sharedByItem, options),
     });
 
     return { url: pr.data.html_url };
   }
 }
-
-

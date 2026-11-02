@@ -139,6 +139,7 @@ export function buildPrBody(
   selectedItems: CatalogItem[],
   upToDateItems: CatalogItem[] = [],
   sharedByItem: Map<string, string[]> = new Map(),
+  options: { update?: boolean } = {},
 ): string {
   const grouped = groupItems(selectedItems, sharedByItem);
   const hasHook = [...grouped.values()]
@@ -182,6 +183,13 @@ export function buildPrBody(
   if (hasHook) {
     notes.push(
       '- `.claude/settings.json`은 덮어쓰지 않고 기존 내용에 훅 설정만 병합합니다.',
+    );
+  }
+  if (options.update) {
+    // 이 저장소가 이미 쓰고 있는 항목의 최신본이다. 사용자가 파일을 직접 고쳐 썼다면 그 내용이
+    // 덮어써지는데, PR 리뷰가 그걸 막을 유일한 안전장치라 diff를 확인하라고 명시한다.
+    notes.push(
+      '- 이 저장소에 이미 있는 항목을 최신 내용으로 갱신하는 PR입니다. 해당 파일을 직접 수정했다면 그 내용이 덮어써지므로, 머지하기 전에 diff를 확인하세요.',
     );
   }
   notes.push('- 머지하면 다음 세션부터 적용됩니다.');
