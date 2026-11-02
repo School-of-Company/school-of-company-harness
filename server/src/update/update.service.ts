@@ -36,6 +36,8 @@ export interface RepoUpdateResult {
   items?: string[];
   fileCount?: number;
   url?: string;
+  /** PR의 기준(base) 브랜치. 판단을 마친 레포에만 있다. */
+  baseBranch?: string;
 }
 
 export interface RunUpdateOptions {
@@ -43,6 +45,11 @@ export interface RunUpdateOptions {
   apply: boolean;
   /** `owner/repo` 목록. 주어지면 그 레포만 대상으로 한다. */
   only?: string[];
+  /**
+   * PR의 기준 브랜치로 우선 쓸 이름 (예: `develop`). 그 브랜치가 있는 레포는 그걸 기준으로 하고,
+   * 없는 레포는 기본 브랜치로 되돌아간다 — 통합 브랜치를 두지 않는 레포까지 실패시키지 않으려고.
+   */
+  base?: string;
 }
 
 /**
@@ -71,7 +78,11 @@ export class UpdateService {
    * 빈 레포 하나 때문에 전체가 멈추면 어디까지 처리됐는지 알 수 없어서다.
    * 순차로 도는 이유는 GitHub 요청 속도 제한과, 문제가 생겼을 때 로그를 따라가기 쉽게 하려는 것.
    */
-  async run({ apply, only }: RunUpdateOptions): Promise<RepoUpdateResult[]> {
+  async run({
+    apply,
+    only,
+    base,
+  }: RunUpdateOptions): Promise<RepoUpdateResult[]> {
     // 카탈로그 원본 레포는 `.claude/skills/...`를 "쓰는" 게 아니라 "만드는" 곳이라, 경로만 보면
     // 사용 중으로 추론된다. 자기 자신에게 PR을 보낼 이유가 없어 처음부터 대상에서 뺀다.
     //
@@ -91,7 +102,7 @@ export class UpdateService {
     const results: RepoUpdateResult[] = [];
     for (const repo of repos) {
       results.push(
-        await this.updateRepo(repo, catalog, apply).catch(
+        await this.updateRepo(repo, catalog, apply, base).catch(
           (error: unknown): RepoUpdateResult => ({
             owner: repo.owner,
             repo: repo.repo,
@@ -108,12 +119,20 @@ export class UpdateService {
     target: RegisteredRepo,
     catalog: CatalogItem[],
     apply: boolean,
+    preferredBase?: string,
   ): Promise<RepoUpdateResult> {
-    const { owner, repo, installationId, defaultBranch } = target;
-    const base = { owner, repo };
+    const { owner, repo, installationId } = target;
     const octokit = await this.tokenManager.getOctokit(installationId);
+    // 무엇을 쓰고 있는지 읽는 브랜치와 PR이 향하는 브랜치가 같아야, 기준 브랜치에 아직 없는 파일을
+    // "이미 쓰는 항목"으로 잘못 판단하거나 이미 있는 파일을 새로 보내는 일이 없다.
+    const baseBranch = await this.resolveBaseBranch(
+      octokit,
+      target,
+      preferredBase,
+    );
+    const base = { owner, repo, baseBranch };
 
-    const tree = await this.readTreePaths(octokit, target);
+    const tree = await this.readTreePaths(octokit, target, baseBranch);
     if (tree.kind === 'empty') {
       return { ...base, status: 'skipped', detail: '커밋이 없는 빈 저장소' };
     }
@@ -144,7 +163,7 @@ export class UpdateService {
       owner,
       repo,
       installationId,
-      baseBranch: defaultBranch,
+      baseBranch,
       itemIds: installed.map((item) => item.id),
     });
     if (plan.files.length === 0) return { ...base, status: 'up-to-date' };
@@ -174,13 +193,30 @@ export class UpdateService {
     return { ...summary, status: 'created', url };
   }
 
+  /** 우선 브랜치가 레포에 있으면 그것을, 없으면 기본 브랜치를 쓴다. 404 외의 오류는 그대로 올린다. */
+  private async resolveBaseBranch(
+    octokit: Octokit,
+    { owner, repo, defaultBranch }: RegisteredRepo,
+    preferred?: string,
+  ): Promise<string> {
+    if (!preferred || preferred === defaultBranch) return defaultBranch;
+    try {
+      await octokit.rest.repos.getBranch({ owner, repo, branch: preferred });
+      return preferred;
+    } catch (error) {
+      if ((error as { status?: number }).status === 404) return defaultBranch;
+      throw error;
+    }
+  }
+
   /**
-   * 기본 브랜치의 파일 경로 목록. `getTree`는 브랜치 이름을 그대로 받아서 한 번의 호출로 끝난다.
+   * 기준 브랜치의 파일 경로 목록. `getTree`는 브랜치 이름을 그대로 받아서 한 번의 호출로 끝난다.
    * 409는 커밋이 없는 레포다.
    */
   private async readTreePaths(
     octokit: Octokit,
-    { owner, repo, defaultBranch }: RegisteredRepo,
+    { owner, repo }: RegisteredRepo,
+    branch: string,
   ): Promise<
     { kind: 'ok'; paths: string[] } | { kind: 'empty' } | { kind: 'truncated' }
   > {
@@ -188,7 +224,7 @@ export class UpdateService {
       const tree = await octokit.rest.git.getTree({
         owner,
         repo,
-        tree_sha: defaultBranch,
+        tree_sha: branch,
         recursive: 'true',
       });
       if (tree.data.truncated) return { kind: 'truncated' };

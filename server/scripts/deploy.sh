@@ -8,6 +8,8 @@
 #   (없음) | deploy          배포한다. 카탈로그가 바뀌었으면 이미 쓰는 레포에 갱신 PR도 연다
 #   update-repos             배포 없이 갱신 PR만 연다 (자동 갱신이 실패했을 때 다시 돌리는 용도)
 #   update-repos --dry-run   무엇이 갱신 대상인지만 보여준다
+#   update-repos --base develop [--dry-run]
+#                            PR의 기준 브랜치로 develop을 우선 쓴다 (develop이 없는 레포는 기본 브랜치)
 #
 # 카탈로그(.claude/.agents/.codex)만 바뀐 배포는 항목을 요청마다 파일에서 읽기 때문에 pull만으로
 # 끝난다. `server/`가 바뀐 경우에만 의존성 설치·빌드·재시작을 한다 — 재시작하는 몇 초 동안은
@@ -18,7 +20,8 @@ before="${1:?직전 커밋 SHA가 필요합니다}"
 command="${SSH_ORIGINAL_COMMAND:-deploy}"
 
 case "$command" in
-  deploy | update-repos | "update-repos --dry-run") ;;
+  deploy | update-repos | "update-repos --dry-run" | \
+    "update-repos --base develop" | "update-repos --base develop --dry-run") ;;
   *)
     echo "허용되지 않은 명령: $command" >&2
     exit 2
@@ -47,6 +50,14 @@ case "$command" in
     ;;
   "update-repos --dry-run")
     update_repos "dry-run" ""
+    exit 0
+    ;;
+  "update-repos --base develop")
+    update_repos "PR 생성 (기준 develop)" "--apply --base develop"
+    exit 0
+    ;;
+  "update-repos --base develop --dry-run")
+    update_repos "dry-run (기준 develop)" "--base develop"
     exit 0
     ;;
 esac

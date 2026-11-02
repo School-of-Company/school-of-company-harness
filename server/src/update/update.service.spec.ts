@@ -54,6 +54,8 @@ function setup(options: {
     }[]
   >;
   plan?: PrPlan;
+  /** 레포 이름 → 그 레포에 있는 (기본 브랜치 외의) 브랜치. `getBranch` 응답을 정한다. */
+  branches?: Record<string, string[] | Error>;
 }) {
   const octokit = {
     rest: {
@@ -63,6 +65,16 @@ function setup(options: {
           if (tree instanceof Error) throw tree;
           return tree;
         }),
+      },
+      repos: {
+        getBranch: vi.fn(
+          async ({ repo, branch }: { repo: string; branch: string }) => {
+            const found = options.branches?.[repo];
+            if (found instanceof Error) throw found;
+            if (found?.includes(branch)) return { data: { name: branch } };
+            throw Object.assign(new Error('Branch not found'), { status: 404 });
+          },
+        ),
       },
       pulls: {
         list: vi.fn(async ({ repo }: { repo: string }) => ({
@@ -306,6 +318,64 @@ describe('UpdateService.run', () => {
       expect(results.map((r) => `${r.owner}/${r.repo}`)).toEqual([
         'someone/mine',
       ]);
+    });
+  });
+
+  describe('--base', () => {
+    const withTree = (extra: object = {}) => ({
+      repos: [repoOf('a')],
+      trees: { a: treeOf('.claude/skills/test/SKILL.md') },
+      plan: planOf({ files: [{ path: 'x', content: 'y' }] as never }),
+      ...extra,
+    });
+
+    it('그 브랜치가 있는 레포는 그것을 읽고 그것을 향해 PR을 만든다', async () => {
+      const { service, octokit, prService } = setup(
+        withTree({ branches: { a: ['develop'] } }),
+      );
+      const [result] = await service.run({ apply: true, base: 'develop' });
+      expect(result.status).toBe('created');
+      expect(result.baseBranch).toBe('develop');
+      expect(octokit.rest.git.getTree).toHaveBeenCalledWith(
+        expect.objectContaining({ tree_sha: 'develop' }),
+      );
+      expect(prService.plan).toHaveBeenCalledWith(
+        expect.objectContaining({ baseBranch: 'develop' }),
+      );
+    });
+
+    it('그 브랜치가 없는 레포는 기본 브랜치로 되돌아간다', async () => {
+      const { service, octokit, prService } = setup(withTree());
+      const [result] = await service.run({ apply: true, base: 'develop' });
+      expect(result.status).toBe('created');
+      expect(result.baseBranch).toBe('main');
+      expect(octokit.rest.git.getTree).toHaveBeenCalledWith(
+        expect.objectContaining({ tree_sha: 'main' }),
+      );
+      expect(prService.plan).toHaveBeenCalledWith(
+        expect.objectContaining({ baseBranch: 'main' }),
+      );
+    });
+
+    it('404가 아닌 오류는 기본 브랜치로 넘기지 않고 오류로 보고한다', async () => {
+      const { service, prService } = setup(
+        withTree({
+          branches: {
+            a: Object.assign(new Error('rate limited'), { status: 403 }),
+          },
+        }),
+      );
+      const [result] = await service.run({ apply: true, base: 'develop' });
+      expect(result.status).toBe('error');
+      expect(result.detail).toBe('rate limited');
+      expect(prService.open).not.toHaveBeenCalled();
+    });
+
+    it('지정하지 않으면 브랜치를 조회하지 않고 기본 브랜치를 쓴다', async () => {
+      const { service, octokit } = setup(withTree());
+      const [result] = await service.run({ apply: false });
+      expect(result.baseBranch).toBe('main');
+      expect(octokit.rest.repos.getBranch).not.toHaveBeenCalled();
     });
   });
 });

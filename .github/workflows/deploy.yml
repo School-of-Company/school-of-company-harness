@@ -25,6 +25,8 @@ on:
           - deploy
           - update-repos
           - update-repos --dry-run
+          - update-repos --base develop
+          - update-repos --base develop --dry-run
         default: deploy
 
 # 배포 두 개가 같은 작업 트리를 동시에 건드리면 pull과 빌드가 엉킨다.
