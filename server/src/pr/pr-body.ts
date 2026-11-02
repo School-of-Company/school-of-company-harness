@@ -56,8 +56,8 @@ function groupItems(
     const platform = platformOf(item);
     const isHook =
       item.category === 'claude-hook' || item.category === 'codex-hook';
-    const docs = (sharedByItem.get(item.id) ?? []).map(
-      (path) => path.split('/').pop()!,
+    const docs = (sharedByItem.get(item.id) ?? []).map((path) =>
+      path.split('/').pop()!,
     );
 
     if (existing) {
@@ -105,9 +105,7 @@ function summarize(selectedItems: CatalogItem[]): string {
     return `${list[0].name} ${group}`;
   }
 
-  return entries
-    .map(([group, list]) => `${group} ${list.length}`)
-    .join(' · ');
+  return entries.map(([group, list]) => `${group} ${list.length}`).join(' · ');
 }
 
 /**
@@ -160,7 +158,10 @@ export function buildPrBody(
         const docs = item.sharedDocs.map((doc) => `\`${doc}\``).join(', ');
         notes.push(`규칙이 적힌 공용 문서 ${docs}이(가) 함께 포함됩니다`);
       }
-      return [`- **${item.name}** (${platforms})`, ...notes.map((n) => `  - ${n}`)].join('\n');
+      return [
+        `- **${item.name}** (${platforms})`,
+        ...notes.map((n) => `  - ${n}`),
+      ].join('\n');
     });
     return `### ${group}\n\n${lines.join('\n')}`;
   });
