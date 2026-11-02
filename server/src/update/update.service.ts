@@ -46,8 +46,9 @@ export interface RunUpdateOptions {
   /** `owner/repo` 목록. 주어지면 그 레포만 대상으로 한다. */
   only?: string[];
   /**
-   * PR의 기준 브랜치로 우선 쓸 이름 (예: `develop`). 그 브랜치가 있는 레포는 그걸 기준으로 하고,
-   * 없는 레포는 기본 브랜치로 되돌아간다 — 통합 브랜치를 두지 않는 레포까지 실패시키지 않으려고.
+   * PR의 기준 브랜치 (예: `develop`). 주어지면 그 브랜치가 있는 레포만 대상으로 하고, 없는 레포는
+   * 건너뛴다. 기본 브랜치로 되돌아가지 않는 이유: "통합 브랜치로 모은다"는 의도로 지정한 것인데,
+   * 그 브랜치가 없는 레포에 기본 브랜치(대개 배포 브랜치)로 PR이 열리면 의도와 반대가 된다.
    */
   base?: string;
 }
@@ -130,6 +131,14 @@ export class UpdateService {
       target,
       preferredBase,
     );
+    if (!baseBranch) {
+      return {
+        owner,
+        repo,
+        status: 'skipped',
+        detail: `${preferredBase} 브랜치가 없음`,
+      };
+    }
     const base = { owner, repo, baseBranch };
 
     const tree = await this.readTreePaths(octokit, target, baseBranch);
@@ -193,18 +202,18 @@ export class UpdateService {
     return { ...summary, status: 'created', url };
   }
 
-  /** 우선 브랜치가 레포에 있으면 그것을, 없으면 기본 브랜치를 쓴다. 404 외의 오류는 그대로 올린다. */
+  /** 지정한 브랜치가 레포에 있으면 그것을, 없으면 undefined를 돌려준다. 지정이 없으면 기본 브랜치다. 404 외의 오류는 그대로 올린다. */
   private async resolveBaseBranch(
     octokit: Octokit,
     { owner, repo, defaultBranch }: RegisteredRepo,
     preferred?: string,
-  ): Promise<string> {
+  ): Promise<string | undefined> {
     if (!preferred || preferred === defaultBranch) return defaultBranch;
     try {
       await octokit.rest.repos.getBranch({ owner, repo, branch: preferred });
       return preferred;
     } catch (error) {
-      if ((error as { status?: number }).status === 404) return defaultBranch;
+      if ((error as { status?: number }).status === 404) return undefined;
       throw error;
     }
   }
