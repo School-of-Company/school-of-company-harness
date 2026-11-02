@@ -25,11 +25,11 @@ Nothing is merged for you, and nothing is pushed to a protected branch. The PR i
 
 ## What's in the catalog
 
-62 items, mirrored for both Claude Code and Codex:
+72 items, mirrored for both Claude Code and Codex:
 
 | Kind       | Examples                                                                                                                                                                                                                                         |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Skills** | `write-pr`, `git-commit`, `test`, `security-checklist`, `systematic-debugging`, `planning`, `resolve-reviews`, `api-design`, `docker`, `find-skill`, and per-stack architecture guides (`kotlin-spring-arch`, `java-spring-arch`, `nestjs-arch`) |
+| **Skills** | `write-pr`, `write-issue`, `git-commit`, `test`, `security-checklist`, `systematic-debugging`, `planning`, `resolve-reviews`, `api-design`, `docker`, `find-skill`, and per-stack architecture guides (`kotlin-spring-arch`, `java-spring-arch`, `nestjs-arch`) |
 | **Agents** | `contradiction-finder`, `doc-polisher`, `prompt-polisher`, `web-researcher`, `frontend-convention-validator`, `kotlin-convention-validator`, `kotlin-test-fixer`                                                                                 |
 | **Hooks**  | Formatters and linters that run on file edits (`ktlint`, `spotless`, `eslint`, `oxlint`, `prettier`, `ruff`, `ts-check`), test runners (`gradle-test`, `jest`), and guards (`secret-guard`, `command-guard`)                                     |
 
