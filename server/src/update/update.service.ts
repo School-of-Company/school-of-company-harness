@@ -74,10 +74,17 @@ export class UpdateService {
   async run({ apply, only }: RunUpdateOptions): Promise<RepoUpdateResult[]> {
     // 카탈로그 원본 레포는 `.claude/skills/...`를 "쓰는" 게 아니라 "만드는" 곳이라, 경로만 보면
     // 사용 중으로 추론된다. 자기 자신에게 PR을 보낼 이유가 없어 처음부터 대상에서 뺀다.
+    //
+    // `--only`가 없으면 원본 레포와 같은 계정의 레포만 대상으로 한다. App은 개인 계정에도 설치돼
+    // 있을 수 있는데, 배포 직후 자동으로 도는 경로(CD)가 그 레포들에까지 PR을 열면 안 된다.
+    // 사람이 `--only`로 이름을 적은 레포는 그대로 존중한다.
+    const sourceOwner = SOURCE_REPO.split('/')[0].toLowerCase();
     const repos = (await this.reposService.listRepos()).filter(
-      ({ owner, repo }) =>
-        `${owner}/${repo}`.toLowerCase() !== SOURCE_REPO.toLowerCase() &&
-        (!only || only.includes(`${owner}/${repo}`)),
+      ({ owner, repo }) => {
+        const name = `${owner}/${repo}`;
+        if (name.toLowerCase() === SOURCE_REPO.toLowerCase()) return false;
+        return only ? only.includes(name) : owner.toLowerCase() === sourceOwner;
+      },
     );
     const catalog = this.catalogService.listItems();
 

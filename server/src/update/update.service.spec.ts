@@ -19,7 +19,7 @@ const hook: CatalogItem = {
 const catalog = [skill, hook];
 
 const repoOf = (name: string): RegisteredRepo => ({
-  owner: 'org',
+  owner: 'School-of-Company',
   repo: name,
   installationId: 1,
   defaultBranch: 'main',
@@ -107,7 +107,10 @@ describe('UpdateService.run', () => {
           {
             number: 7,
             html_url: 'https://github.com/org/a/pull/7',
-            head: { ref: 'harness/123', repo: { full_name: 'org/a' } },
+            head: {
+              ref: 'harness/123',
+              repo: { full_name: 'School-of-Company/a' },
+            },
           },
         ],
       },
@@ -126,7 +129,10 @@ describe('UpdateService.run', () => {
           {
             number: 3,
             html_url: 'https://github.com/org/a/pull/3',
-            head: { ref: 'feat/login', repo: { full_name: 'org/a' } },
+            head: {
+              ref: 'feat/login',
+              repo: { full_name: 'School-of-Company/a' },
+            },
           },
         ],
       },
@@ -246,7 +252,10 @@ describe('UpdateService.run', () => {
       repos: [repoOf('a'), repoOf('b')],
       trees: { a: treeOf('x'), b: treeOf('x') },
     });
-    const results = await service.run({ apply: false, only: ['org/b'] });
+    const results = await service.run({
+      apply: false,
+      only: ['School-of-Company/b'],
+    });
     expect(results.map((r) => r.repo)).toEqual(['b']);
     expect(octokit.rest.git.getTree).toHaveBeenCalledTimes(1);
   });
@@ -268,5 +277,35 @@ describe('UpdateService.run', () => {
     });
     expect(results).toEqual([]);
     expect(octokit.rest.git.getTree).not.toHaveBeenCalled();
+  });
+
+  describe('다른 계정의 레포', () => {
+    const personal: RegisteredRepo = { ...repoOf('mine'), owner: 'someone' };
+
+    it('--only가 없으면 원본 레포와 같은 계정의 레포만 대상으로 한다', async () => {
+      const { service, octokit } = setup({
+        repos: [repoOf('a'), personal],
+        trees: { a: treeOf('x'), mine: treeOf('x') },
+      });
+      const results = await service.run({ apply: true });
+      expect(results.map((r) => `${r.owner}/${r.repo}`)).toEqual([
+        'School-of-Company/a',
+      ]);
+      expect(octokit.rest.git.getTree).toHaveBeenCalledTimes(1);
+    });
+
+    it('사람이 --only로 이름을 적으면 그대로 처리한다', async () => {
+      const { service } = setup({
+        repos: [repoOf('a'), personal],
+        trees: { a: treeOf('x'), mine: treeOf('x') },
+      });
+      const results = await service.run({
+        apply: false,
+        only: ['someone/mine'],
+      });
+      expect(results.map((r) => `${r.owner}/${r.repo}`)).toEqual([
+        'someone/mine',
+      ]);
+    });
   });
 });

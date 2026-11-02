@@ -10,7 +10,10 @@ const USAGE = `사용법: npm run update:repos -- [--apply] [--only owner/repo[,
 
   (옵션 없음)  dry-run — 아무것도 쓰지 않고 어떤 레포가 갱신 대상인지만 보여준다
   --apply      바뀐 레포에 실제로 PR을 만든다
-  --only       지정한 레포만 대상으로 한다 (쉼표로 구분)`;
+  --only       지정한 레포만 대상으로 한다 (쉼표로 구분)
+
+  --only 없이는 카탈로그 원본 레포와 같은 계정의 레포만 대상이다 (원본 레포 자신은 항상 제외).
+  다른 계정의 레포는 --only로 이름을 적어야 처리한다.`;
 
 const LABELS: Record<UpdateStatus, string> = {
   created: 'PR 생성',
