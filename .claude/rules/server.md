@@ -22,6 +22,19 @@ What that means concretely, so nobody has to re-derive it:
 - If this ever needs real access control, that's a deliberate follow-up decision — don't bolt on partial
   auth (e.g. a hardcoded shared secret) without discussing it first.
 
+## Bulk Update Is a CLI, Not an Endpoint
+
+`update/` opens PRs on many repos at once, so it is deliberately **not** reachable over HTTP: it has no
+controller and isn't imported by `AppModule` (its own root is `update/update-cli.module.ts`, started by
+`update-cli.ts`). With no auth on the API, a "update every repo" endpoint would let anyone who knows the
+URL fan PRs out across all installed repos — the single-repo `POST /pr` bounds that to one repo per call,
+and a bulk route would remove the bound.
+
+- Don't add a controller or schedule for it without settling access control first (see "No Authentication").
+- It defaults to dry-run; `--apply` is what writes.
+- "In use" is inferred from paths in the target repo, so a hand-written skill that happens to share a
+  catalog name is treated as in use. The PR body says to check the diff, and review is the safeguard.
+
 ## Binding & Exposure
 
 The server listens on all interfaces (`*:3001`), and the host it runs on sits behind NAT, so reachability

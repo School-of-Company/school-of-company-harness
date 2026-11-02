@@ -52,6 +52,7 @@ only calls this server's API and never touches GitHub App credentials.
 | `repos/`              | `GET /repos` — live list of installed repos                                                         |
 | `recommendation/`     | Detect the target repo's stack and decide which items apply. Advisory only                          |
 | `pr/`                 | `POST /pr` — file collection, hook dependencies, settings.json merge, change detection, PR creation |
+| `update/`             | Bulk update **CLI** (not an endpoint) — infer which items each repo already uses, PR only the changed |
 
 Pure logic is split into its own files so it can be tested without network or filesystem:
 `pr/settings-merge.ts`, `pr/tree-diff.ts`, `recommendation/stack-detection.ts`,
@@ -108,7 +109,14 @@ npm run build          # nest build
 npm test               # vitest run
 npm run lint           # oxlint src/ test/
 npm run start:dev      # watch mode, port 3001
+npm run update:repos             # dry-run: which repos already using the harness have changes (writes nothing)
+npm run update:repos -- --apply  # open one PR on each of those repos
 ```
+
+`update:repos` is for after the catalog changed: it reads every installed repo's file list, treats a catalog
+path that exists there as "in use", and sends only what differs — a repo that is current gets no PR, and
+a repo with an open `harness/*` PR is skipped. It runs where the App credentials are (the VM, from
+`server/` after `npm run build`), by a person; nothing calls it automatically.
 
 ESM project (`"type": "module"`, `moduleResolution: nodenext`): relative imports need the `.js`
 extension, and there is no `__dirname` — use `import.meta.url`.
