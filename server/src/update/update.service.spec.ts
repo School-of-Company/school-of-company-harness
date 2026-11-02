@@ -344,17 +344,22 @@ describe('UpdateService.run', () => {
       );
     });
 
-    it('그 브랜치가 없는 레포는 기본 브랜치로 되돌아간다', async () => {
+    it('그 브랜치가 없는 레포는 기본 브랜치로 되돌아가지 않고 건너뛴다', async () => {
       const { service, octokit, prService } = setup(withTree());
       const [result] = await service.run({ apply: true, base: 'develop' });
-      expect(result.status).toBe('created');
+      expect(result.status).toBe('skipped');
+      expect(result.detail).toBe('develop 브랜치가 없음');
+      // 기본 브랜치(대개 배포 브랜치)로 PR이 열리거나 그 트리를 읽는 일이 없어야 한다
+      expect(octokit.rest.git.getTree).not.toHaveBeenCalled();
+      expect(prService.plan).not.toHaveBeenCalled();
+      expect(prService.open).not.toHaveBeenCalled();
+    });
+
+    it('기본 브랜치와 같은 이름을 지정하면 조회 없이 그대로 쓴다', async () => {
+      const { service, octokit } = setup(withTree());
+      const [result] = await service.run({ apply: false, base: 'main' });
       expect(result.baseBranch).toBe('main');
-      expect(octokit.rest.git.getTree).toHaveBeenCalledWith(
-        expect.objectContaining({ tree_sha: 'main' }),
-      );
-      expect(prService.plan).toHaveBeenCalledWith(
-        expect.objectContaining({ baseBranch: 'main' }),
-      );
+      expect(octokit.rest.repos.getBranch).not.toHaveBeenCalled();
     });
 
     it('404가 아닌 오류는 기본 브랜치로 넘기지 않고 오류로 보고한다', async () => {
