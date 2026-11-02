@@ -250,4 +250,23 @@ describe('UpdateService.run', () => {
     expect(results.map((r) => r.repo)).toEqual(['b']);
     expect(octokit.rest.git.getTree).toHaveBeenCalledTimes(1);
   });
+
+  it('카탈로그 원본 레포는 --only로 지정해도 대상에서 뺀다', async () => {
+    const source: RegisteredRepo = {
+      ...repoOf('school-of-company-harness'),
+      owner: 'School-of-Company',
+    };
+    const { service, octokit } = setup({
+      repos: [source],
+      trees: {
+        'school-of-company-harness': treeOf('.claude/skills/test/SKILL.md'),
+      },
+    });
+    const results = await service.run({
+      apply: true,
+      only: ['School-of-Company/school-of-company-harness'],
+    });
+    expect(results).toEqual([]);
+    expect(octokit.rest.git.getTree).not.toHaveBeenCalled();
+  });
 });

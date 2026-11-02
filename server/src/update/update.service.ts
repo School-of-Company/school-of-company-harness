@@ -6,6 +6,7 @@ import {
   INSTALLATION_TOKEN_MANAGER,
   type InstallationTokenManager,
 } from '../installation-token/installation-token-manager.interface.js';
+import { SOURCE_REPO } from '../pr/pr-body.js';
 import { PrService } from '../pr/pr.service.js';
 import { ReposService, type RegisteredRepo } from '../repos/repos.service.js';
 import { findInstalledItems } from './installed-items.js';
@@ -71,8 +72,12 @@ export class UpdateService {
    * 순차로 도는 이유는 GitHub 요청 속도 제한과, 문제가 생겼을 때 로그를 따라가기 쉽게 하려는 것.
    */
   async run({ apply, only }: RunUpdateOptions): Promise<RepoUpdateResult[]> {
+    // 카탈로그 원본 레포는 `.claude/skills/...`를 "쓰는" 게 아니라 "만드는" 곳이라, 경로만 보면
+    // 사용 중으로 추론된다. 자기 자신에게 PR을 보낼 이유가 없어 처음부터 대상에서 뺀다.
     const repos = (await this.reposService.listRepos()).filter(
-      ({ owner, repo }) => !only || only.includes(`${owner}/${repo}`),
+      ({ owner, repo }) =>
+        `${owner}/${repo}`.toLowerCase() !== SOURCE_REPO.toLowerCase() &&
+        (!only || only.includes(`${owner}/${repo}`)),
     );
     const catalog = this.catalogService.listItems();
 

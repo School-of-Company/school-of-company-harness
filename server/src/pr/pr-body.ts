@@ -1,7 +1,8 @@
 import type { CatalogItem } from '../catalog/catalog.types.js';
 
-const SOURCE_REPO_URL =
-  'https://github.com/School-of-Company/school-of-company-harness';
+/** 카탈로그 원본 레포. 일괄 업데이트가 자기 자신에게 PR을 보내지 않도록 `update/`도 이 값을 쓴다. */
+export const SOURCE_REPO = 'School-of-Company/school-of-company-harness';
+const SOURCE_REPO_URL = `https://github.com/${SOURCE_REPO}`;
 
 /**
  * 내부 카테고리(플랫폼별로 6종)를 사용자에게 보여줄 3개 그룹으로 접는다.

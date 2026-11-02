@@ -32,6 +32,8 @@ and a bulk route would remove the bound.
 
 - Don't add a controller or schedule for it without settling access control first (see "No Authentication").
 - It defaults to dry-run; `--apply` is what writes.
+- The catalog's own repo is always excluded — it holds the items at their deployment paths, so path
+  inference would otherwise count it as "in use" and send it a PR of its own files.
 - "In use" is inferred from paths in the target repo, so a hand-written skill that happens to share a
   catalog name is treated as in use. The PR body says to check the diff, and review is the safeguard.
 
