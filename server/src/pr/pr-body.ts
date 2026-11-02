@@ -1,4 +1,5 @@
 import type { CatalogItem } from '../catalog/catalog.types.js';
+import { DEFAULT_TITLE_STYLE, type TitleStyle } from './pr-title-style.js';
 
 /** 카탈로그 원본 레포. 일괄 업데이트가 자기 자신에게 PR을 보내지 않도록 `update/`도 이 값을 쓴다. */
 export const SOURCE_REPO = 'School-of-Company/school-of-company-harness';
@@ -116,14 +117,15 @@ function summarize(selectedItems: CatalogItem[]): string {
  * PR이 섞여 있으므로, 목록에서 "하네스가 보낸 것"이 한눈에 구분되는 편이 낫다. 대신 정보가
  * 없는 꼬리말("~ 추가")은 떼고, 무엇이 들어왔는지가 바로 오게 했다.
  *
- * `[global]` 같은 범위 접두어는 붙이지 않는다. 대상 레포 중에는 PR 제목 검사를 CI로 거는 곳이 있고
- * (Expo 계열 일부), 그 규칙이 "범위 접두어·이모지 없이 50자 이하"라서 접두어가 있으면 검사가
- * 실패한다. 다른 레포의 제목 관례는 제각각이라(`[scope]`, `feat ::`, 없음) 가장 엄격한 쪽에 맞추면
- * 어디서도 걸리지 않는다. 자동 갱신으로 같은 레포에 반복해서 PR이 열리는 만큼, 실패하는 PR이
- * 매번 생기는 일은 막아야 한다.
+ * 접두어는 대상 레포가 정한다(`pr-title-style.ts`). 레포마다 CI의 제목 검사가 달라서, 어떤 곳은
+ * `[scope] 설명`을 필수로 걸고 어떤 곳은 접두어를 금지한다. `하네스 동기화 —` 부분은 어느 쪽이든 같다.
  */
-export function buildPrTitle(selectedItems: CatalogItem[]): string {
-  return `하네스 동기화 — ${summarize(selectedItems)}`;
+export function buildPrTitle(
+  selectedItems: CatalogItem[],
+  style: TitleStyle = DEFAULT_TITLE_STYLE,
+): string {
+  const title = `하네스 동기화 — ${summarize(selectedItems)}`;
+  return style === 'scoped' ? `[global] ${title}` : title;
 }
 
 /**
