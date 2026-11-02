@@ -111,13 +111,16 @@ npm run lint           # oxlint src/ test/
 npm run start:dev      # watch mode, port 3001
 npm run update:repos             # dry-run: which repos already using the harness have changes (writes nothing)
 npm run update:repos -- --apply  # open one PR on each of those repos
+npm run update:repos -- --apply --base develop  # same, aimed at develop where a repo has one
 ```
 
 `update:repos` is for after the catalog changed: it reads every installed repo's file list, treats a catalog
 path that exists there as "in use", and sends only what differs — a repo that is current gets no PR, and
 a repo with an open `harness/*` PR is skipped. It runs where the App credentials are (the VM, from
 `server/` after `npm run build`). The deploy runs it for you when the catalog changed (see Deployment); by
-hand it is the way to retry one that failed, or to preview with the dry-run. Without `--only` it covers just
+hand it is the way to retry one that failed, or to preview with the dry-run. `--base develop` points the PRs at
+the integration branch where a repo has one (the others keep their default branch); the automatic run still
+uses the default branch. Without `--only` it covers just
 the catalog repo's own account.
 
 ESM project (`"type": "module"`, `moduleResolution: nodenext`): relative imports need the `.js`
