@@ -160,15 +160,25 @@ dependencies** (see "Catalog Item Dependency Rule") — nothing else in the targ
 
 ## PR Title & Base Branch
 
-- Title is a fixed `하네스 동기화 —` prefix, then what was included. It carries **no `[scope]` prefix**:
-  some target repos run a CI title check ("no scope prefix, no emoji, at most 50 characters") and every
-  other repo's convention differs (`[scope]`, `feat ::`, none), so the strictest rule is the one that
-  passes everywhere. A title that fails a repo's check opens a red PR there each time the harness runs.
+- Title is a fixed `하네스 동기화 —` prefix, then what was included, and **whether it gets a `[global]`
+  scope in front is decided per target repo** (`server/src/pr/pr-title-style.ts`):
 
   ```
-  하네스 동기화 — 스킬 10 · 에이전트 4 · 훅 5
-  하네스 동기화 — test 스킬
+  [global] 하네스 동기화 — 스킬 10 · 에이전트 4 · 훅 5     (scoped)
+  하네스 동기화 — test 스킬                              (plain)
   ```
+
+  There is no format that passes everywhere — target repos run CI title checks that contradict each other:
+  some require `[form|survey|json|global|ci/cd] 설명` as a required check, another forbids any scope prefix
+  ("no scope prefix, no emoji, at most 50 characters"). A fixed title opens a red PR in whichever repos it
+  disagrees with, every time the harness runs. The first fixed choice (`[global]` everywhere) broke the
+  second kind; the second (no prefix everywhere) broke the first, on the very next run.
+
+  The style is read from the repo, in this order: (1) its workflows' title check, but only the two shapes
+  we can read reliably — a scope list that includes `global`, or wording that forbids a scope prefix; a
+  check we can't read is "unknown", not a guess; (2) the convention in its last 30 PR titles, ignoring the
+  harness's own and needing at least 5 others; (3) `scoped`. A failure while reading never blocks the PR —
+  it falls back to the default and the repo's own CI says if that was wrong.
 
   One item is named outright; several collapse to per-group counts joined with ` · `. The prefix is there
   because these PRs land in a list next to human-authored ones — the reader should be able to tell at a
