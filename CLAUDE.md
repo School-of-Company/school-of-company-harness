@@ -129,19 +129,32 @@ DTOs must be **classes** and must not be imported with `import type`. `Validatio
 The server runs on a school VM behind NAT, reachable at `https://startup.https.gsmsv.site` through a
 reverse proxy the infra team operates.
 
+**Merging to `main` deploys** (`.github/workflows/deploy.yml`). The job SSHes in with a key that is pinned
+to one command, `~/deploy-harness.sh`, which pulls and then runs `server/scripts/deploy.sh`: a
+catalog-only change stops after the pull, a `server/` change also runs `npm ci`, build, restart and a
+`GET /catalog` check. Deploys never run in parallel. To deploy by hand (or to look at logs):
+
 ```bash
-ssh -p 21107 ubuntu@ssh.gsmsv.site
-cd ~/harness && git pull && cd server && npm run build && sudo systemctl restart harness
+ssh -p 27131 ubuntu@ssh.gsmsv.site
+~/deploy-harness.sh
 systemctl status harness && journalctl -u harness -n 50
 ```
 
-- `harness.service` (systemd, `Restart=always`, enabled) runs `node dist/main.js` on `*:3001`
+One-time setup, done on a fresh VM: put `~/deploy-harness.sh` on the VM (`git rev-parse HEAD` before
+`git pull --ff-only`, then `exec bash server/scripts/deploy.sh "$before"`), authorize the deploy key
+as `restrict,command="/home/ubuntu/deploy-harness.sh" <public key>` in `~/.ssh/authorized_keys`, and set
+the repo secrets `DEPLOY_HOST`, `DEPLOY_PORT`, `DEPLOY_SSH_KEY` and `DEPLOY_KNOWN_HOSTS` (the VM's
+`ssh-keyscan -t ed25519` line — the job refuses a host key it wasn't given). The VM needs npm 11 so
+that `npm ci` accepts the lockfile; npm 10 reports it as out of sync.
+
+- `harness.service` (systemd, `Restart=always`, enabled) runs `node dist/main.js` on `*:80`
+  (`AmbientCapabilities=CAP_NET_BIND_SERVICE`)
 - Config in `~/harness/server/.env`: `GITHUB_APP_ID` (4825250), `GITHUB_PRIVATE_KEY_PATH`, `PORT`,
   `CORS_ORIGIN`
 - The private key is a file, not an env value — systemd's `EnvironmentFile` doesn't restore `\n`
   escapes, and GitHub hands out PKCS#1 while `@octokit/auth-app` wants PKCS#8 (converted in
   `installation-token/private-key.ts`)
-- A catalog-only change needs `git pull` on the VM but no restart — items are read per request
+- A catalog-only change needs the pull but no restart — items are read per request
 - Health check: `GET /catalog` returning 62 items. There is no dedicated health endpoint.
 
 **The API has no authentication, deliberately, and it is publicly reachable.** Anyone with the URL can

@@ -1,0 +1,42 @@
+name: Deploy
+
+# main에 머지되면 학교 VM에 배포한다. 서버 코드와 카탈로그(.claude/.agents/.codex) 어느 쪽이
+# 바뀌어도 VM의 작업 트리가 최신이어야 하므로 둘 다 트리거로 둔다.
+# 배포 절차 자체는 VM의 `~/deploy-harness.sh`가 정하고(SSH 키가 그 명령만 실행하도록 고정),
+# 이 워크플로는 접속만 한다 — `server/scripts/deploy.sh` 참고.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - '.claude/**'
+      - '.agents/**'
+      - '.codex/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+# 배포 두 개가 같은 작업 트리를 동시에 건드리면 pull과 빌드가 엉킨다.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Deploy over SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -p "$DEPLOY_PORT" "ubuntu@$DEPLOY_HOST"
