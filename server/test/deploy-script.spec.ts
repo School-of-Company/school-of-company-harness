@@ -154,4 +154,27 @@ describe('deploy.sh', () => {
     expect(dry.status).toBe(0);
     expect(dry.out).toContain('update-cli 호출: (인자 없음)');
   });
+
+  it('update-repos --base develop은 develop을 우선 기준으로 넘긴다', () => {
+    const head = git('rev-parse', 'HEAD');
+    const apply = deploy(head, 'update-repos --base develop');
+    expect(apply.status).toBe(0);
+    expect(apply.out).toContain('update-cli 호출: --apply --base develop');
+
+    const dry = deploy(head, 'update-repos --base develop --dry-run');
+    expect(dry.status).toBe(0);
+    expect(dry.out).toContain('update-cli 호출: --base develop');
+    expect(dry.out).not.toContain('--apply');
+  });
+
+  it('허용된 형태에서 조금이라도 벗어난 기준 브랜치 지정은 거부한다', () => {
+    const head = git('rev-parse', 'HEAD');
+    for (const command of [
+      'update-repos --base main',
+      'update-repos --base develop --apply',
+      'update-repos --base develop; id',
+    ]) {
+      expect(deploy(head, command).status, command).toBe(2);
+    }
+  });
 });
