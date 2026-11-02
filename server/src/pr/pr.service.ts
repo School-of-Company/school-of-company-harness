@@ -18,6 +18,7 @@ import {
   resolveSharedReferences,
 } from './shared-references.js';
 import { buildCommitMessage, buildPrBody, buildPrTitle } from './pr-body.js';
+import { detectTitleStyle, type TitleStyle } from './pr-title-style.js';
 import { classifyFiles, modeFor } from './tree-diff.js';
 import { CreatePrRequestDto, CreatePrResponseDto } from './pr.dto.js';
 
@@ -47,6 +48,8 @@ export interface PrPlan {
   changedItems: CatalogItem[];
   upToDateItems: CatalogItem[];
   sharedByItem: Map<string, string[]>;
+  /** 이 레포의 CI가 요구하는 PR 제목 형식 — `open()`이 제목을 만들 때 쓴다. */
+  titleStyle: TitleStyle;
 }
 
 export interface OpenPrOptions {
@@ -236,6 +239,7 @@ export class PrService {
       changedItems,
       upToDateItems,
       sharedByItem,
+      titleStyle: await detectTitleStyle(octokit, owner, repo),
     };
   }
 
@@ -255,6 +259,7 @@ export class PrService {
       changedItems,
       upToDateItems,
       sharedByItem,
+      titleStyle,
     } = plan;
 
     // 3) 기존 스냅샷 위에 바뀐 파일만 얹은 새 tree
@@ -294,7 +299,7 @@ export class PrService {
     const pr = await octokit.rest.pulls.create({
       owner,
       repo,
-      title: buildPrTitle(changedItems),
+      title: buildPrTitle(changedItems, titleStyle),
       head: branchName,
       base: baseBranch,
       body: buildPrBody(changedItems, upToDateItems, sharedByItem, options),
