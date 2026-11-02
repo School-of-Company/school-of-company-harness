@@ -30,7 +30,15 @@ controller and isn't imported by `AppModule` (its own root is `update/update-cli
 URL fan PRs out across all installed repos — the single-repo `POST /pr` bounds that to one repo per call,
 and a bulk route would remove the bound.
 
-- Don't add a controller or schedule for it without settling access control first (see "No Authentication").
+- Don't add a controller, or anything else callable by whoever knows the URL, without settling access
+  control first (see "No Authentication").
+- It does run automatically, once per deploy whose commits changed a catalog path (`server/scripts/deploy.sh`).
+  That is allowed because only a push to `main` (or a person dispatching the workflow) can trigger it —
+  the people who can trigger it are the people who can merge — and because it opens PRs and never merges.
+  The SSH deploy key can only run the commands `deploy.sh` lists, so a stolen key cannot ask for more.
+- Without `--only` it covers only the catalog repo's own account. The App may be installed on personal
+  accounts too, and an automatic run must not open PRs there; a person naming a repo with `--only` is
+  taken at their word.
 - It defaults to dry-run; `--apply` is what writes.
 - The catalog's own repo is always excluded — it holds the items at their deployment paths, so path
   inference would otherwise count it as "in use" and send it a PR of its own files.
