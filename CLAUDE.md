@@ -120,7 +120,7 @@ a repo with an open `harness/*` PR is skipped. It runs where the App credentials
 `server/` after `npm run build`). The deploy runs it for you when the catalog changed (see Deployment); by
 hand it is the way to retry one that failed, or to preview with the dry-run. `--base develop` points the PRs at
 the integration branch and skips the repos that have none (it never falls back to the default branch, which
-is usually the one that deploys); the automatic run still uses the default branch. Without `--only` it covers just
+is usually the one that deploys); the automatic run after a deploy does exactly that, so a repo with no `develop` is only reached by hand (`update-repos` in the workflow, or `npm run update:repos -- --apply`). Without `--only` it covers just
 the catalog repo's own account.
 
 ESM project (`"type": "module"`, `moduleResolution: nodenext`): relative imports need the `.js`
@@ -138,7 +138,7 @@ reverse proxy the infra team operates.
 to one command, `~/deploy-harness.sh`, which pulls and then runs `server/scripts/deploy.sh`: a
 catalog-only change stops after the pull, a `server/` change also runs `npm ci`, build, restart and a
 `GET /catalog` check. Deploys never run in parallel. A deploy whose commits touched the catalog paths
-(`.claude/{skills,agents,hooks,templates,shared}`, `.agents`, `.codex`) then opens update PRs on the repos
+(`.claude/{skills,agents,hooks,templates,shared}`, `.agents`, `.codex`) then opens update PRs, aimed at `develop`, on the repos
 already using the harness — PRs only, never merged — and the run summary lists which. It compares against
 the commit this VM last deployed, so cancelled intermediate runs don't hide a change; a failed update is not
 retried by the next deploy, so run the workflow by hand with `update-repos`. To deploy by hand (or to look at
