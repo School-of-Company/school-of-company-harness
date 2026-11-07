@@ -5,8 +5,8 @@
 # 실행한다. 배포 키는 `~/deploy-harness.sh` 하나만 실행하도록 고정돼 있는데, 거기서 이 스크립트가
 # 불려 오므로 이 목록이 곧 그 키로 할 수 있는 일의 전부다.
 #
-#   (없음) | deploy          배포한다. 카탈로그가 바뀌었으면 이미 쓰는 레포에 갱신 PR도 연다
-#   update-repos             배포 없이 갱신 PR만 연다 (자동 갱신이 실패했을 때 다시 돌리는 용도)
+#   (없음) | deploy          배포한다. 카탈로그가 바뀌었으면 이미 쓰는 레포의 develop으로 갱신 PR도 연다
+#   update-repos             배포 없이 갱신 PR만 연다 — 기본 브랜치 기준 (develop이 없는 레포용)
 #   update-repos --dry-run   무엇이 갱신 대상인지만 보여준다
 #   update-repos --base develop [--dry-run]
 #                            PR의 기준 브랜치를 develop으로 한다 (develop이 없는 레포는 건너뛴다)
@@ -98,10 +98,13 @@ else
 fi
 
 # 서비스가 정상일 때만 퍼뜨린다. 방금 올린 빌드가 죽어 있는데 여러 레포에 PR을 여는 일은 없어야 한다.
+# 자동으로 열리는 PR은 develop으로 향한다. 대상 레포 대부분은 기본 브랜치(main)가 곧 운영 배포 브랜치라서,
+# 사람이 보지 않는 사이 거기에 PR이 열려 있는 일이 없어야 한다. develop이 없는 레포는 건너뛴다 —
+# 그런 레포는 `update-repos`로 사람이 직접 연다.
 # 변경 여부는 GitHub가 알려 주는 `before`가 아니라 이 VM이 직전에 실제로 배포한 커밋과 비교한다 —
 # 연속 머지로 중간 배포가 취소돼도 그 사이의 카탈로그 변경을 놓치지 않는다.
 if catalog_changed; then
-  update_repos "PR 생성" "--apply"
+  update_repos "PR 생성 (기준 develop)" "--apply --base develop"
 else
   echo "카탈로그 변경 없음 — 갱신 PR 생략"
 fi
