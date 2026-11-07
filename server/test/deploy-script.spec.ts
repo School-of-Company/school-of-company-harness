@@ -111,7 +111,8 @@ describe('deploy.sh', () => {
     const { status, out } = deploy(before);
     expect(status).toBe(0);
     expect(out).toContain('카탈로그만 변경');
-    expect(out).toContain('update-cli 호출: --apply');
+    // 자동 갱신은 기본 브랜치(운영 배포)가 아니라 develop으로 향한다
+    expect(out).toContain('update-cli 호출: --apply --base develop');
   });
 
   it.each([
