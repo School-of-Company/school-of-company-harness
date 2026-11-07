@@ -36,7 +36,7 @@ only calls this server's API and never touches GitHub App credentials.
 ## How a PR Gets Made
 
 1. Web calls `GET /repos` → every repo the App is installed on (App JWT → installation token → list)
-2. Web calls `GET /catalog` → 76 items, scanned from the paths above
+2. Web calls `GET /catalog` → 80 items, scanned from the paths above
 3. Web calls `GET /repos/:owner/:repo/recommendation` → which items fit that repo, with reasons
 4. User checks items, clicks Create PR → `POST /pr`
 5. Server collects the selected files, resolves hook dependencies, **drops files the target already has
@@ -165,7 +165,7 @@ that `npm ci` accepts the lockfile; npm 10 reports it as out of sync.
   escapes, and GitHub hands out PKCS#1 while `@octokit/auth-app` wants PKCS#8 (converted in
   `installation-token/private-key.ts`)
 - A catalog-only change needs the pull but no restart — items are read per request
-- Health check: `GET /catalog` returning 76 items. There is no dedicated health endpoint.
+- Health check: `GET /catalog` returning 80 items. There is no dedicated health endpoint.
 
 **The API has no authentication, deliberately, and it is publicly reachable.** Anyone with the URL can
 list every installed repo (including private repo _names_) and open a PR on one. The blast radius is
