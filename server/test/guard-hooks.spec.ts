@@ -107,7 +107,46 @@ const cases: Record<
       why: '안전한 push 옆에 맨 -f push가 섞인 경우',
     },
     { command: 'git reset --hard HEAD~1', expected: 'block', why: '변경 소실' },
-    { command: 'rm -rf dist', expected: 'pass', why: '다시 빌드하면 되는 삭제' },
+    {
+      command: 'git checkout .',
+      expected: 'block',
+      why: '작업 트리 전체 되돌리기',
+    },
+    {
+      command: 'git checkout -- .',
+      expected: 'block',
+      why: '작업 트리 전체 되돌리기',
+    },
+    {
+      command: 'git restore .',
+      expected: 'block',
+      why: '작업 트리 전체 되돌리기',
+    },
+    {
+      command: 'git restore --staged --worktree .',
+      expected: 'block',
+      why: '인덱스와 작업 트리를 함께 되돌림',
+    },
+    {
+      command: 'git restore --staged .',
+      expected: 'pass',
+      why: '인덱스만 내리고 변경은 남는다',
+    },
+    {
+      command: 'git checkout feat/x',
+      expected: 'pass',
+      why: '브랜치 전환은 변경을 지우지 않는다',
+    },
+    {
+      command: 'git restore src/a.ts',
+      expected: 'pass',
+      why: '파일 하나는 의도가 분명하다',
+    },
+    {
+      command: 'rm -rf dist',
+      expected: 'pass',
+      why: '다시 빌드하면 되는 삭제',
+    },
   ],
   'secret-guard': [
     { command: 'cat .env', expected: 'block', why: '시크릿을 화면으로' },
