@@ -25,7 +25,7 @@ Nothing is merged for you, and nothing is pushed to a protected branch. The PR i
 
 ## What's in the catalog
 
-80 items, mirrored for both Claude Code and Codex:
+84 items, mirrored for both Claude Code and Codex:
 
 | Kind       | Examples                                                                                                                                                                                                                                         |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
