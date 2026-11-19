@@ -1,5 +1,7 @@
 import type { Octokit } from '@octokit/rest';
 import type { CatalogItem } from '../catalog/catalog.types.js';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { readCatalogFile, type CollectedFile } from './file-collector.js';
 import { mergeClaudeSettings } from './settings-merge.js';
 
@@ -39,7 +41,13 @@ export async function resolveHookDependencies(
         path: '.claude/hooks/postToolUse.sh',
         content: readCatalogFile('.claude/hooks/postToolUse.sh', catalogRoot),
       },
-      await buildClaudeSettings(octokit, owner, repo, catalogRoot),
+      await buildClaudeSettings(
+        octokit,
+        owner,
+        repo,
+        catalogRoot,
+        hasPostToolUseModule(selectedItems, catalogRoot),
+      ),
     );
   }
 
@@ -82,11 +90,27 @@ export async function resolveHookDependencies(
  * 3번이 얕은 병합이면 안 되는 이유는 `settings-merge.ts`에 적어 두었다: `hooks` 키를 통째로
  * 갈아끼우면 대상 레포가 직접 넣은 훅 항목이 조용히 사라진다.
  */
+/**
+ * 고른 Claude 훅 중에 `postToolUse.sh`를 가진 모듈이 있는지.
+ *
+ * `secret-guard`·`command-guard`는 PreToolUse 전용이다. 이런 훅만 고르고도 PostToolUse를 걸어 두면,
+ * 도구를 쓸 때마다 dispatcher가 실행되지만 돌릴 모듈이 없어 아무 일도 하지 않는다.
+ */
+export function hasPostToolUseModule(
+  selectedItems: CatalogItem[],
+  catalogRoot: string,
+): boolean {
+  return selectedItems
+    .filter((item) => item.category === 'claude-hook')
+    .some((item) => existsSync(join(catalogRoot, item.path, 'postToolUse.sh')));
+}
+
 async function buildClaudeSettings(
   octokit: Octokit,
   owner: string,
   repo: string,
   catalogRoot: string,
+  withPostToolUse: boolean,
 ): Promise<CollectedFile> {
   let base: Record<string, unknown>;
   try {
@@ -105,6 +129,14 @@ async function buildClaudeSettings(
   const hooksFragment = JSON.parse(
     readCatalogFile('.claude/templates/settings-hooks.json', catalogRoot),
   ) as { hooks?: unknown };
+
+  if (
+    !withPostToolUse &&
+    typeof hooksFragment.hooks === 'object' &&
+    hooksFragment.hooks
+  ) {
+    delete (hooksFragment.hooks as Record<string, unknown>).PostToolUse;
+  }
 
   const merged = mergeClaudeSettings(base, hooksFragment);
   return {
