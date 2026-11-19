@@ -120,3 +120,100 @@ describe('mergeClaudeSettings', () => {
     expect(merged.hooks.PreToolUse).toHaveLength(1);
   });
 });
+
+/** 지금 템플릿(`.claude/templates/settings-hooks.json`)과 같은 모양. */
+const CURRENT_HOOKS = {
+  hooks: {
+    PreToolUse: [
+      {
+        matcher: 'Bash|Write|Edit',
+        hooks: [
+          {
+            type: 'command',
+            command: '"$CLAUDE_PROJECT_DIR"/.claude/hooks/preToolUse.sh',
+          },
+        ],
+      },
+    ],
+    PostToolUse: [
+      {
+        matcher: 'Edit|Write',
+        hooks: [
+          {
+            type: 'command',
+            command: '"$CLAUDE_PROJECT_DIR"/.claude/hooks/postToolUse.sh',
+          },
+        ],
+      },
+    ],
+  },
+};
+
+describe('mergeClaudeSettings — 이미 설치된 예전 wiring 승급', () => {
+  const legacy = {
+    hooks: {
+      PreToolUse: [OUR_HOOKS.hooks.PreToolUse[0]],
+      PostToolUse: [OUR_HOOKS.hooks.PostToolUse[0]],
+    },
+  };
+
+  it('상대 경로·Bash 전용이던 항목을 새 모양으로 올리되 항목을 늘리지 않는다', () => {
+    const merged = mergeClaudeSettings(legacy, CURRENT_HOOKS);
+
+    // Bash 만 걸면 Write/Edit 를 검사하는 secret-guard 가 실행되지 않는다
+    expect(merged.hooks).toEqual(CURRENT_HOOKS.hooks);
+  });
+
+  it('사람이 일부러 좁힌 matcher 는 그대로 두고 경로만 고친다', () => {
+    const base = {
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: 'Bash(git push*)',
+            hooks: [
+              { type: 'command', command: '.claude/hooks/preToolUse.sh' },
+            ],
+          },
+        ],
+      },
+    };
+
+    const merged = mergeClaudeSettings(base, CURRENT_HOOKS);
+    const entries = (merged.hooks as typeof CURRENT_HOOKS.hooks).PreToolUse;
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].matcher).toBe('Bash(git push*)');
+    expect(entries[0].hooks[0].command).toBe(
+      '"$CLAUDE_PROJECT_DIR"/.claude/hooks/preToolUse.sh',
+    );
+  });
+
+  it('승급한 뒤 다시 병합해도 아무것도 바뀌지 않는다 (멱등)', () => {
+    const once = mergeClaudeSettings(legacy, CURRENT_HOOKS);
+    expect(mergeClaudeSettings(once, CURRENT_HOOKS)).toEqual(once);
+  });
+
+  it('같은 항목에 섞여 있는 대상 레포의 다른 명령은 건드리지 않는다', () => {
+    const base = {
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: 'Bash',
+            hooks: [
+              { type: 'command', command: '.claude/hooks/preToolUse.sh' },
+              { type: 'command', command: '.claude/hooks/mine.sh' },
+            ],
+          },
+        ],
+      },
+    };
+
+    const merged = mergeClaudeSettings(base, CURRENT_HOOKS);
+    const [entry] = (merged.hooks as typeof CURRENT_HOOKS.hooks).PreToolUse;
+
+    expect(entry.hooks.map((hook) => hook.command)).toEqual([
+      '"$CLAUDE_PROJECT_DIR"/.claude/hooks/preToolUse.sh',
+      '.claude/hooks/mine.sh',
+    ]);
+  });
+});

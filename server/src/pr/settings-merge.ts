@@ -27,6 +27,59 @@ function isHookEntryArray(value: unknown): value is HookEntry[] {
 }
 
 /**
+ * 따옴표와 `$CLAUDE_PROJECT_DIR/` 접두어를 걷어낸 스크립트 경로.
+ *
+ * 우리 dispatcher 는 처음엔 상대 경로(`.claude/hooks/preToolUse.sh`)로 걸렸고, 지금은
+ * `"$CLAUDE_PROJECT_DIR"/.claude/hooks/preToolUse.sh` 로 건다. 두 표기가 같은 스크립트를 가리키는 줄
+ * 알아야, 이미 설치한 레포에 항목이 하나 더 쌓이지 않고 기존 항목이 새 모양으로 올라간다.
+ */
+function scriptKey(command: string): string {
+  return command
+    .replace(/["']/g, '')
+    .replace(/^\$\{?CLAUDE_PROJECT_DIR\}?\//, '');
+}
+
+/**
+ * 예전 템플릿이 쓰던 matcher. 이 값 그대로인 항목만 새 matcher 로 올린다.
+ *
+ * `Bash` 만 걸면 Write/Edit 로 파일에 비밀을 쓰는 검사(`secret-guard`)가 한 번도 실행되지 않는다.
+ * 사람이 일부러 좁혀 둔 matcher(`Bash(git push*)` 등)는 의도가 있으므로 건드리지 않는다.
+ */
+const LEGACY_MATCHER: Record<string, string> = { PreToolUse: 'Bash' };
+
+/** 같은 스크립트를 가리키는 기존 항목을 우리 항목의 모양으로 올린다. 그 밖의 항목은 그대로 둔다. */
+function upgradeEntry(
+  event: string,
+  entry: HookEntry,
+  ourEntries: HookEntry[],
+): HookEntry {
+  const ours = ourEntries.find((candidate) =>
+    commandsOf(candidate).some((command) =>
+      commandsOf(entry).some((own) => scriptKey(own) === scriptKey(command)),
+    ),
+  );
+  if (!ours) return entry;
+
+  const ourCommands = new Map(
+    commandsOf(ours).map((command) => [scriptKey(command), command]),
+  );
+  const upgraded: HookEntry = {
+    ...entry,
+    hooks: entry.hooks?.map((hook) => {
+      const target =
+        typeof hook.command === 'string'
+          ? ourCommands.get(scriptKey(hook.command))
+          : undefined;
+      return target ? { ...hook, command: target } : hook;
+    }),
+  };
+  if (ours.matcher !== undefined && entry.matcher === LEGACY_MATCHER[event]) {
+    upgraded.matcher = ours.matcher;
+  }
+  return upgraded;
+}
+
+/**
  * 이벤트별 훅 목록을 **더한다**.
  *
  * 원래는 `{ ...base, hooks: 우리것 }`으로 `hooks` 키를 통째로 갈아끼웠다. 최상위 키
@@ -57,12 +110,14 @@ function mergeHooks(baseHooks: unknown, ourHooks: HooksByEvent): HooksByEvent {
   }
 
   for (const [event, ourEntries] of Object.entries(ourHooks)) {
-    const existing = merged[event] ?? [];
-    const wired = new Set(existing.flatMap(commandsOf));
+    const existing = (merged[event] ?? []).map((entry) =>
+      upgradeEntry(event, entry, ourEntries),
+    );
+    const wired = new Set(existing.flatMap(commandsOf).map(scriptKey));
     const toAdd = ourEntries.filter((entry) => {
       const commands = commandsOf(entry);
-      // 명령이 하나라도 아직 안 걸려 있으면 추가한다.
-      return commands.some((command) => !wired.has(command));
+      // 스크립트가 하나라도 아직 안 걸려 있으면 추가한다.
+      return commands.some((command) => !wired.has(scriptKey(command)));
     });
     merged[event] = [...existing, ...toAdd];
   }
