@@ -86,7 +86,14 @@ fully independent systems — enabling one does not enable the other.
        `.claude/templates/settings-base.json` if it doesn't have one)
      - Merge in the entries from `.claude/templates/settings-hooks.json` **per hook entry**, not by
        replacing the `hooks` key — append what's missing, skip what's already wired (matched on the
-       command path, so a differently written `matcher` doesn't wire the dispatcher twice)
+       script path with quotes and `$CLAUDE_PROJECT_DIR/` stripped, so a differently written `matcher` or
+       path doesn't wire the dispatcher twice)
+     - **Our own older wiring is upgraded in place**, not duplicated: a dispatcher entry written with a
+       relative path gets the `"$CLAUDE_PROJECT_DIR"/…` path, and a `matcher` that is still exactly the old
+       `Bash` becomes `Bash|Write|Edit`. A matcher a person narrowed on purpose is left alone
+     - `PostToolUse` is only wired when a selected hook has a `postToolUse.sh` — `secret-guard` and
+       `command-guard` are PreToolUse-only, and wiring a dispatcher with nothing to run is a process spawn
+       on every edit for no effect
      - Add the resulting `settings.json` plus the dispatcher scripts to the file list automatically
   - Always start from the target repo's existing file so we never clobber its custom settings. Top-level
     keys (`permissions`, `language`, …) are not the only thing at risk: replacing the `hooks` key wholesale
