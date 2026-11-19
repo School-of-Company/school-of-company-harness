@@ -171,8 +171,65 @@ const cases: Record<
       why: '값이 빈 템플릿 복사',
     },
     { command: 'ls -l .env', expected: 'pass', why: '존재만 확인' },
+    {
+      command: 'cat .env.example',
+      expected: 'pass',
+      why: '값이 빈 템플릿을 읽음',
+    },
+    {
+      command: 'cat .env.example .env',
+      expected: 'block',
+      why: '템플릿 옆에 진짜 .env 를 같이 읽는 경우',
+    },
+    {
+      command: 'head -n 3 .env.sample .env.local',
+      expected: 'block',
+      why: '템플릿과 함께 .env.local 을 읽는 경우',
+    },
   ],
 };
+
+function judgeWrite(script: string, filePath: string, content: string) {
+  const input = JSON.stringify({
+    tool_name: 'Write',
+    tool_input: { file_path: filePath, content },
+  });
+  const { status } = spawnSync('bash', [root + script], { input });
+  return status === 2 ? 'block' : 'pass';
+}
+
+// 소스에 리터럴로 적으면 비밀 스캐너가 이 테스트 파일을 잡는다 — 실행할 때 만든다.
+const fakeToken = `ghp_${'a'.repeat(36)}`;
+
+describe.skipIf(!hasJq)('secret-guard: 파일에 쓰기', () => {
+  const writes: { path: string; expected: Verdict; why: string }[] = [
+    { path: 'src/config.ts', expected: 'block', why: '일반 소스에 토큰' },
+    {
+      path: 'src/config.environment.ts',
+      expected: 'block',
+      why: '이름에 env 가 들어 있을 뿐인 일반 소스',
+    },
+    {
+      path: 'src/environment.ts',
+      expected: 'block',
+      why: 'env 로 시작하는 소스',
+    },
+    { path: '.env', expected: 'pass', why: '값을 담는 게 목적인 파일' },
+    { path: '.env.local', expected: 'pass', why: '값을 담는 게 목적인 파일' },
+    { path: 'config/prod.env', expected: 'pass', why: '.env 확장자 파일' },
+  ];
+  for (const [platform, script] of Object.entries(guards['secret-guard'])) {
+    describe(platform, () => {
+      for (const { path, expected, why } of writes) {
+        it(`${expected}: ${why} (${path})`, () => {
+          expect(judgeWrite(script, path, `token=${fakeToken}`), path).toBe(
+            expected,
+          );
+        });
+      }
+    });
+  }
+});
 
 describe.skipIf(!hasJq)('guard hooks', () => {
   for (const [guard, scripts] of Object.entries(guards)) {
